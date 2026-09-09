@@ -17,7 +17,9 @@ function TakeExamInner() {
   const [current, setCurrent] = useState(0);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [deadline, setDeadline] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [showReview, setShowReview] = useState(false);
   const [online, setOnline] = useState(true);
   const [savedTick, setSavedTick] = useState(false);
@@ -36,8 +38,10 @@ function TakeExamInner() {
       setAttemptId(body.attempt.id);
       if (body.attempt.draft_answers) setAnswers(body.attempt.draft_answers);
 
-      const elapsedSeconds = Math.floor((Date.now() - new Date(body.attempt.started_at).getTime()) / 1000);
-      setSecondsLeft(Math.max(body.test.time_limit_minutes * 60 - elapsedSeconds, 0));
+      const startedAt = new Date(body.attempt.started_at).getTime();
+      const absoluteDeadline = startedAt + body.test.time_limit_minutes * 60 * 1000;
+      setDeadline(absoluteDeadline);
+      setSecondsLeft(Math.max(0, (absoluteDeadline - Date.now()) / 1000));
 
       const qRes = await fetch(`/api/questions?test_id=${body.test.id}`);
       setQuestions(await qRes.json());
@@ -48,14 +52,21 @@ function TakeExamInner() {
   useEffect(() => {
     const goOffline = () => setOnline(false);
     const goOnline = () => { setOnline(true); saveProgress(); };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && deadline) {
+        setSecondsLeft(Math.max(0, (deadline - Date.now()) / 1000));
+      }
+    };
     window.addEventListener("offline", goOffline);
     window.addEventListener("online", goOnline);
+    window.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.removeEventListener("offline", goOffline);
       window.removeEventListener("online", goOnline);
+      window.removeEventListener("visibilitychange", handleVisibility);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attemptId, answers]);
+  }, [attemptId, answers, deadline]);
 
   function saveProgress() {
     if (!attemptId) return;
@@ -87,16 +98,38 @@ function TakeExamInner() {
   const submit = useMemo(
     () => async (autoSubmitted: boolean) => {
       if (!attemptId || submitted) return;
-      setSubmitted(true);
-      await fetch("/api/exam/submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          attempt_id: attemptId,
-          auto_submitted: autoSubmitted,
-          answers: Object.entries(answers).map(([question_id, response]) => ({ question_id, response })),
-        }),
-      });
+
+      const payload = {
+        attempt_id: attemptId,
+        auto_submitted: autoSubmitted,
+        answers: Object.entries(answers).map(([question_id, response]) => ({ question_id, response })),
+      };
+
+      const maxRetries = 3;
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const res = await fetch("/api/exam/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (res.ok) {
+            setSubmitted(true);
+            return;
+          }
+
+          if (attempt < maxRetries) {
+            await new Promise((r) => setTimeout(r, 1000 * attempt));
+          }
+        } catch {
+          if (attempt < maxRetries) {
+            await new Promise((r) => setTimeout(r, 1000 * attempt));
+          }
+        }
+      }
+
+      setSubmitError("Something went wrong submitting your exam. Your answers are saved on this device. Please tell your admin your exam did not submit, and try refreshing this page.");
     },
     [attemptId, answers, submitted]
   );
@@ -104,9 +137,15 @@ function TakeExamInner() {
   useEffect(() => {
     if (secondsLeft === null || submitted) return;
     if (secondsLeft <= 0) { submit(true); return; }
-    const t = setTimeout(() => setSecondsLeft((s) => (s ?? 1) - 1), 1000);
+    const t = setTimeout(() => {
+      if (deadline) {
+        setSecondsLeft(Math.max(0, (deadline - Date.now()) / 1000));
+      } else {
+        setSecondsLeft((s) => (s ?? 1) - 1);
+      }
+    }, 1000);
     return () => clearTimeout(t);
-  }, [secondsLeft, submit, submitted]);
+  }, [secondsLeft, submit, submitted, deadline]);
 
   if (submitted) {
     return (
@@ -117,6 +156,18 @@ function TakeExamInner() {
           <p className="text-sm text-rfcm-charcoal/70">
             Your result will be available when released by R.F.C.M. Use "Check My Result" from the home page later.
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (submitError) {
+    return (
+      <main className="min-h-screen bg-rfcm-cream flex items-center justify-center p-4 text-center">
+        <div className="bg-white border border-rfcm-red rounded-2xl shadow-sm p-10 max-w-sm">
+          <div className="text-4xl mb-3">⚠️</div>
+          <h1 className="font-serif text-xl font-bold mb-2 text-rfcm-red">Submission failed</h1>
+          <p className="text-sm text-rfcm-charcoal/70">{submitError}</p>
         </div>
       </main>
     );

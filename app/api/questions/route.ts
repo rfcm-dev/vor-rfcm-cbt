@@ -9,12 +9,20 @@ export async function GET(req: NextRequest) {
   const testId = req.nextUrl.searchParams.get("test_id");
   if (!testId) return NextResponse.json({ error: "test_id is required" }, { status: 400 });
 
-  const { data, error } = await db
+  const user = await getSessionUser();
+  const mineOnly = req.nextUrl.searchParams.get("mine") === "1";
+
+  let query = db
     .from("questions")
     .select("*")
     .eq("test_id", testId)
     .order("order_index", { ascending: true });
 
+  if (mineOnly && user) {
+    query = query.eq("created_by", user.id);
+  }
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
@@ -38,6 +46,7 @@ export async function POST(req: NextRequest) {
       correct_answer: type === "essay" ? null : correct_answer,
       points: points ?? 1,
       order_index: order_index ?? 0,
+      created_by: user.id,
     })
     .select()
     .single();

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import DashboardShell from "@/components/DashboardShell";
 
 type TestSummary = { id: string; title: string; status: string; opens_at: string | null; closes_at: string | null; time_limit_minutes: number; submitted_count: number; pending_grading_count: number; ready_to_release_count: number };
-type AttemptRow = { id: string; student_name: string; started_at: string; submitted_at: string | null; status: string; result: { total_score: number | null; status: string } | null };
+type AttemptRow = { id: string; student_name: string; started_at: string; submitted_at: string | null; status: string; late_seconds: number; result: { total_score: number | null; status: string } | null };
 
 export default function ResultsPage() {
   const [tests, setTests] = useState<TestSummary[]>([]);
@@ -85,6 +85,9 @@ export default function ResultsPage() {
               <span className="text-xs text-rfcm-charcoal/50 ml-2">
                 {a.status === "in_progress" ? "In progress" : a.status === "submitted" || a.status === "auto_submitted" ? (a.result ? "Processing" : "Submitted — processing") : a.status}
               </span>
+              {a.late_seconds > 0 && (
+                <span className="text-xs text-rfcm-red ml-2">Submitted {Math.round(a.late_seconds / 60)}m late</span>
+              )}
             </span>
             <span className="text-sm text-rfcm-charcoal/60">
               {a.result ? `${a.result.total_score ?? "pending"} pts · ${a.result.status}` : "No result yet"}

@@ -16,6 +16,7 @@ export default function AdminsPage() {
   const [role, setRole] = useState("admin");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
 
   function load() {
     fetch("/api/admins")
@@ -23,6 +24,13 @@ export default function AdminsPage() {
       .then(setAdmins)
       .catch(() => setAdmins([]));
   }
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.ok ? r.json() : { role: "" })
+      .then((data) => setCurrentUserRole(data.role ?? ""))
+      .catch(() => setCurrentUserRole(""));
+  }, []);
+
   useEffect(load, []);
 
   async function handleAdd(e: React.FormEvent) {
@@ -57,7 +65,8 @@ export default function AdminsPage() {
           className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
         <select value={role} onChange={(e) => setRole(e.target.value)}
           className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2">
-          <option value="admin">Admin</option>
+          {currentUserRole === "superadmin" && <option value="admin">Admin</option>}
+          <option value="executive">Executive</option>
           <option value="teacher">Teacher</option>
         </select>
         {error && <p className="text-sm text-rfcm-red">{error}</p>}

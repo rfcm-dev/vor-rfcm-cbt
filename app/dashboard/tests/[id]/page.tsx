@@ -7,7 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import DashboardShell from "@/components/DashboardShell";
 import { useToast } from "@/components/ToastProvider";
 
-type Question = { id: string; type: string; content: string; options: any; correct_answer: string | null; points: number };
+type Question = { id: string; type: string; content: string; options: any; correct_answer: string | null; points: number; created_by: string | null; users: { name: string } | null };
 type TestRow = { id: string; title: string; status: string; exam_code: string; opens_at: string | null; closes_at: string | null; time_limit_minutes: number };
 type ClassRow = { id: string; name: string };
 
@@ -53,6 +53,7 @@ export default function TestDetailPage() {
   const [uploadSuccess, setUploadSuccess] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showMine, setShowMine] = useState(false);
 
   async function loadPublishedClasses() {
     const res = await fetch(`/api/tests/${id}/classes`);
@@ -89,7 +90,10 @@ export default function TestDetailPage() {
   }
 
   function loadQuestions() {
-    fetch(`/api/questions?test_id=${id}`)
+    const params = new URLSearchParams();
+    params.set("test_id", id);
+    if (showMine) params.set("mine", "1");
+    fetch(`/api/questions?${params}`)
       .then((r) => r.ok ? r.json() : [])
       .then(setQuestions)
       .catch(() => setQuestions([]));
@@ -121,7 +125,7 @@ export default function TestDetailPage() {
     }).catch(() => {});
     loadQuestions();
     loadAllClasses();
-  }, [id]);
+  }, [id, showMine]);
 
   async function addQuestion(e: React.FormEvent) {
     e.preventDefault();
@@ -406,7 +410,13 @@ export default function TestDetailPage() {
         </div>
 
         <div className="space-y-3">
-          <p className="font-semibold text-sm text-rfcm-charcoal/70">{questions.length} question(s) added</p>
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-sm text-rfcm-charcoal/70">{questions.length} question(s) added</p>
+            <label className="flex items-center gap-2 text-sm text-rfcm-charcoal/70">
+              <input type="checkbox" checked={showMine} onChange={(e) => setShowMine(e.target.checked)} />
+              Show only mine
+            </label>
+          </div>
           {questions.map((q, i) => (
             <div key={q.id} className="bg-white rounded-lg border border-rfcm-yellow-soft p-3 text-sm">
               <div className="flex justify-between items-start">
@@ -417,6 +427,7 @@ export default function TestDetailPage() {
                 </div>
               </div>
               <p className="text-xs text-rfcm-charcoal/50 mt-1">{q.type} · {q.points} pt(s)</p>
+              {q.users?.name && <p className="text-xs text-rfcm-charcoal/40 mt-1">Added by {q.users.name}</p>}
             </div>
           ))}
         </div>

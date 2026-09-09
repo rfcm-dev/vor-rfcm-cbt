@@ -11,7 +11,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  if (req.nextUrl.pathname.startsWith("/dashboard/admins") && user.role !== "superadmin") {
+  if (req.nextUrl.pathname.startsWith("/dashboard/admins") && !["superadmin", "admin"].includes(user.role)) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 

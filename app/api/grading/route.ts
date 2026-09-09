@@ -7,11 +7,11 @@ import { getSessionUser } from "@/lib/session";
 export async function GET(req: NextRequest) {
   const user = await getSessionUser();
   const testId = req.nextUrl.searchParams.get("test_id");
-  const includeGraded = req.nextUrl.searchParams.get("all") === "1" && user?.role === "superadmin";
+  const includeGraded = req.nextUrl.searchParams.get("all") === "1" && ["superadmin", "admin"].includes(user?.role ?? "");
 
   let query = db
     .from("answers")
-    .select("*, questions!inner(type, content, points, test_id), attempts!inner(student_id, students(name))")
+    .select("*, questions!inner(type, content, points, test_id, tests!inner(title)), attempts!inner(student_id, students(name))")
     .eq("questions.type", "essay");
 
   if (!includeGraded) query = query.is("manual_score", null);

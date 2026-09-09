@@ -7,7 +7,7 @@ const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
 export type SessionUser = {
   id: string;
   name: string;
-  role: "superadmin" | "admin" | "teacher";
+  role: "superadmin" | "admin" | "executive" | "teacher";
 };
 
 export async function hashPassword(password: string) {

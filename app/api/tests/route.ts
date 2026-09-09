@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const { data: attempts } = await db
     .from("attempts")
-    .select("test_id, status")
+    .select("id, test_id, status")
     .in("test_id", (data ?? []).map((t: any) => t.id));
 
   const { data: results } = await db

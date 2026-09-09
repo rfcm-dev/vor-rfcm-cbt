@@ -10,7 +10,7 @@ type PendingAnswer = {
   id: string;
   response: string;
   manual_score: number | null;
-  questions: { content: string; points: number };
+  questions: { content: string; points: number; test_id: string; tests: { title: string } };
   attempts: { students: { name: string } };
 };
 
@@ -33,6 +33,13 @@ export default function GradingPage() {
   }
 
   useEffect(load, [testId, showGraded]);
+
+  const grouped = items.reduce<Record<string, PendingAnswer[]>>((acc, item) => {
+    const title = item.questions.tests?.title ?? "Unknown Exam";
+    if (!acc[title]) acc[title] = [];
+    acc[title].push(item);
+    return acc;
+  }, {});
 
   async function submitScore(answerId: string) {
     const manual_score = scores[answerId];
@@ -65,29 +72,31 @@ export default function GradingPage() {
       <input value={testId} onChange={(e) => setTestId(e.target.value)} placeholder="Filter by test ID (optional)"
         className="w-full max-w-md mb-6 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
 
-      <div className="max-w-2xl space-y-4">
-        {items.map((item) => (
-          <div key={item.id} className="bg-white rounded-xl border border-rfcm-yellow-soft p-5 space-y-3">
-            <p className="text-xs text-rfcm-charcoal/50">{item.attempts?.students?.name}</p>
-            <p>{item.questions.content}</p>
-            <p className="text-sm text-rfcm-charcoal/60 border-l-2 border-rfcm-yellow-soft pl-3">{item.response}</p>
-            {item.manual_score !== null && (
-              <p className="text-xs text-rfcm-red">Currently scored: {item.manual_score} / {item.questions.points}</p>
-            )}
-            <div className="flex items-center gap-3">
-              <input type="number" min={0} max={item.questions.points}
-                defaultValue={item.manual_score ?? undefined}
-                className="w-20 rounded-lg border border-rfcm-yellow-soft px-2 py-1"
-                onChange={(e) => setScores((s) => ({ ...s, [item.id]: Number(e.target.value) }))} />
-              <span className="text-sm text-rfcm-charcoal/60">/ {item.questions.points}</span>
-              <button onClick={() => submitScore(item.id)} disabled={busyId === item.id} className="rounded-lg bg-rfcm-red text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50">
-                {busyId === item.id ? "Saving..." : item.manual_score !== null ? "Update score" : "Save score"}
-              </button>
+      {Object.entries(grouped).map(([examTitle, examItems]) => (
+        <div key={examTitle} className="space-y-4">
+          <h2 className="font-serif text-lg font-bold text-rfcm-charcoal">{examTitle}</h2>
+          {examItems.map((item) => (
+            <div key={item.id} className="bg-white rounded-xl border border-rfcm-yellow-soft p-5 space-y-3">
+              <p className="text-xs text-rfcm-charcoal/50">{item.attempts?.students?.name}</p>
+              <p>{item.questions.content}</p>
+              <p className="text-sm text-rfcm-charcoal/60 border-l-2 border-rfcm-yellow-soft pl-3">{item.response}</p>
+              {item.manual_score !== null && (
+                <p className="text-xs text-rfcm-red">Currently scored: {item.manual_score} / {item.questions.points}</p>
+              )}
+              <div className="flex items-center gap-3">
+                <input type="number" min={0} max={item.questions.points}
+                  defaultValue={item.manual_score ?? undefined}
+                  className="w-20 rounded-lg border border-rfcm-yellow-soft px-2 py-1"
+                  onChange={(e) => setScores((s) => ({ ...s, [item.id]: Number(e.target.value) }))} />
+                <span className="text-sm text-rfcm-charcoal/60">/ {item.questions.points}</span>
+                <button onClick={() => submitScore(item.id)} disabled={busyId === item.id} className="rounded-lg bg-rfcm-red text-white px-3 py-1.5 text-sm font-medium disabled:opacity-50">
+                  {busyId === item.id ? "Saving..." : item.manual_score !== null ? "Update score" : "Save score"}
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
-        {items.length === 0 && <p className="text-rfcm-charcoal/50">Nothing waiting on grading right now.</p>}
-      </div>
+          ))}
+        </div>
+      ))}
     </DashboardShell>
   );
 }

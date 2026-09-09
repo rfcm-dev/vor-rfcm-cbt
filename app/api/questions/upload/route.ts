@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
       if (!correct_answer) { errors.push(`Row ${rowNum}: fill_blank needs a Correct Answer`); return; }
     }
 
-    toInsert.push({ test_id: testId, type, content: question, options, correct_answer, points, order_index: i });
+    toInsert.push({ test_id: testId, type, content: question, options, correct_answer, points, order_index: i, created_by: user.id });
   });
 
   if (errors.length > 0) {

@@ -16,6 +16,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "This attempt was already submitted" }, { status: 409 });
   }
 
+  const { data: test } = await db.from("tests").select("time_limit_minutes").eq("id", attempt.test_id).single();
+  const limitSeconds = (test?.time_limit_minutes ?? 0) * 60;
+  const elapsedSeconds = (Date.now() - new Date(attempt.started_at).getTime()) / 1000;
+  const isLate = elapsedSeconds > limitSeconds + 60;
+  const finalStatus = isLate ? "auto_submitted" : (auto_submitted ? "auto_submitted" : "submitted");
+  const lateSeconds = isLate ? Math.max(0, Math.round(elapsedSeconds - limitSeconds)) : 0;
+
   const { data: questions } = await db.from("questions").select("*").eq("test_id", attempt.test_id);
   const questionsById = new Map((questions ?? []).map((q) => [q.id, q]));
 
@@ -36,13 +43,26 @@ export async function POST(req: NextRequest) {
     };
   });
 
+  if (rows.length === 0) {
+    return NextResponse.json({ error: "No answers provided" }, { status: 400 });
+  }
+
   const { error: answersError } = await db.from("answers").insert(rows);
   if (answersError) return NextResponse.json({ error: answersError.message }, { status: 500 });
 
   await db
     .from("attempts")
-    .update({ status: auto_submitted ? "auto_submitted" : "submitted", submitted_at: new Date().toISOString() })
+    .update({ status: finalStatus, submitted_at: new Date().toISOString() })
     .eq("id", attempt_id);
+
+  try {
+    await db
+      .from("attempts")
+      .update({ late_seconds: lateSeconds })
+      .eq("id", attempt_id);
+  } catch {
+    // late_seconds column may not exist yet if migration has not been applied.
+  }
 
   await db.from("results").insert({
     attempt_id,

@@ -23,6 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     started_at: a.started_at,
     submitted_at: a.submitted_at,
     status: a.status,
+    late_seconds: 0,
     result: resultMap[a.id] ?? null,
   }));
 
