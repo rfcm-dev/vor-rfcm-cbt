@@ -20,51 +20,25 @@ export async function GET(req: NextRequest) {
     if (classCode) classQuery = classQuery.eq("class_code", classCode);
 
     const { data: classRow } = await classQuery.maybeSingle();
-    if (!classRow) {
-      console.log("[results/public] class not found", { className, classCode });
-      return NextResponse.json({ error: "Class not found" }, { status: 404 });
-    }
-    console.log("[results/public] class found", { classId: classRow.id, className, classCode });
+    if (!classRow) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
     const trimmedName = studentName.trim();
     const { data: students } = await db
       .from("students")
-      .select("id, name")
+      .select("id")
       .eq("class_id", classRow.id)
       .ilike("name", trimmedName + "%")
-      .limit(5);
-
-    console.log("[results/public] student lookup", { trimmedName, students });
+      .limit(1);
 
     const student = students?.[0];
-    if (!student) {
-      return NextResponse.json({
-        error: "Student not found",
-        debug: {
-          class_id: classRow.id,
-          class_name: className,
-          student_name_queried: trimmedName,
-          students_found: students?.length ?? 0,
-          students_sample: students?.slice(0, 5).map((s: any) => ({ id: s.id, name: s.name })) ?? [],
-        }
-      }, { status: 404 });
-    }
-
-    console.log("[results/public] student matched", { studentId: student.id, studentName: student.name });
+    if (!student) return NextResponse.json([]);
 
     const { data: attempts } = await db
       .from("attempts")
       .select("id, test_id")
       .eq("student_id", student.id);
 
-    console.log("[results/public] attempts", { count: attempts?.length ?? 0, ids: attempts?.map((a: any) => a.id) });
-
-    if (!attempts || attempts.length === 0) {
-      return NextResponse.json({
-        error: "No attempts found for this student",
-        debug: { student_id: student.id, student_name: student.name }
-      }, { status: 404 });
-    }
+    if (!attempts || attempts.length === 0) return NextResponse.json([]);
 
     const testIds = [...new Set(attempts.map((a: any) => a.test_id))];
 
@@ -73,8 +47,6 @@ export async function GET(req: NextRequest) {
       .select("*")
       .in("attempt_id", (attempts ?? []).map((a: any) => a.id))
       .eq("status", "released");
-
-    console.log("[results/public] released results", { count: results?.length ?? 0, ids: results?.map((r: any) => r.attempt_id), statuses: results?.map((r: any) => r.status) });
 
     const { data: matchedAttempts } = results?.length
       ? await db.from("attempts").select("id, test_id, student_id").in("id", (results ?? []).map((r: any) => r.attempt_id))
@@ -85,24 +57,6 @@ export async function GET(req: NextRequest) {
       const attempt = attemptMap[r.attempt_id];
       return attempt?.test_id && testIds.includes(attempt.test_id) && attempt.student_id === student.id;
     });
-
-    if (filteredResults.length === 0 && (results ?? []).length > 0) {
-      return NextResponse.json({
-        error: "Released results exist but do not match this student/test combination.",
-        debug: {
-          student_id: student.id,
-          student_name: studentName,
-          class_id: classRow.id,
-          class_name: className,
-          total_attempts: attempts.length,
-          attempt_ids: attempts.map((a: any) => a.id),
-          total_released_results: (results ?? []).length,
-          released_result_attempt_ids: (results ?? []).map((r: any) => r.attempt_id),
-          matched_attempts: matchedAttempts?.length ?? 0,
-          test_ids: testIds,
-        }
-      }, { status: 404 });
-    }
 
     if (filteredResults.length === 0) return NextResponse.json([]);
 
