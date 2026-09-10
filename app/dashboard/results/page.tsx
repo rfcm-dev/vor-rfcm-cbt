@@ -48,18 +48,12 @@ export default function ResultsPage() {
       setError(data.error || `Release failed (${res.status})`);
       return;
     }
-    if (data.released === 0) {
-      if (data.skipped_already_released > 0) {
-        setError(`${data.skipped_already_released} selected result(s) were already released — nothing new to release.`);
-      } else if (data.message) {
-        setError(data.message);
-      } else {
-        setError("No results were released.");
-      }
-      return;
-    }
-    if (data.skipped_already_released > 0) {
+    if (data.released > 0 && data.skipped_already_released > 0) {
       setError(`Released ${data.released} result(s). ${data.skipped_already_released} was/were already released.`);
+    } else if (data.released === 0 && data.skipped_already_released > 0) {
+      setError(`${data.skipped_already_released} selected result(s) were already released — nothing new to release.`);
+    } else if (data.message) {
+      setError(data.message);
     }
     setSelected([]);
     if (selectedTestId) {
