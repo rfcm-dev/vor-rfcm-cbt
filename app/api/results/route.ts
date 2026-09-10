@@ -57,6 +57,24 @@ export async function GET(req: NextRequest) {
       return attempt?.test_id && testIds.includes(attempt.test_id) && attempt.student_id === student.id;
     });
 
+    if (filteredResults.length === 0 && (results ?? []).length > 0) {
+      return NextResponse.json({
+        error: "Released results exist but do not match this student/test combination.",
+        debug: {
+          student_id: student.id,
+          student_name: studentName,
+          class_id: classRow.id,
+          class_name: className,
+          total_attempts: attempts.length,
+          attempt_ids: attempts.map((a: any) => a.id),
+          total_released_results: results.length,
+          released_result_attempt_ids: results.map((r: any) => r.attempt_id),
+          matched_attempts: matchedAttempts?.length ?? 0,
+          test_ids: testIds,
+        }
+      }, { status: 404 });
+    }
+
     if (filteredResults.length === 0) return NextResponse.json([]);
 
     const { data: tests } = await db.from("tests").select("id, title").in("id", testIds);
