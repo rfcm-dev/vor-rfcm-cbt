@@ -49,7 +49,15 @@ export default function ResultsPage() {
       return;
     }
     if (data.released === 0) {
-      setError("No results were released — they may not be in graded status.");
+      const debug = data.debug;
+      if (debug && debug.already_released && debug.already_released.length > 0) {
+        setError(`0 new releases — ${debug.already_released.length} selected result(s) were already released.`);
+      } else if (debug && debug.other_statuses && debug.other_statuses.length > 0) {
+        const statuses = [...new Set(debug.other_statuses.map((s: any) => s.status))].join(", ");
+        setError(`0 new releases — selected result(s) have status: ${statuses}`);
+      } else {
+        setError("No results were released — they may not be in graded status.");
+      }
       return;
     }
     setSelected([]);
