@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     .from("students")
     .select("*")
     .eq("class_id", class_id)
-    .eq("name", student_name)
+    .ilike("name", student_name.trim())
     .maybeSingle();
 
   if (existing) return NextResponse.json({ student: existing });

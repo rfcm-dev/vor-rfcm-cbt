@@ -16,8 +16,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "class_name and student_name are required" }, { status: 400 });
     }
 
-    let classQuery = db.from("classes").select("id").eq("name", className);
-    if (classCode) classQuery = classQuery.eq("class_code", classCode);
+    let classQuery = db.from("classes").select("id").ilike("name", className);
+    if (classCode) classQuery = classQuery.ilike("class_code", classCode);
 
     const { data: classRow } = await classQuery.maybeSingle();
     if (!classRow) return NextResponse.json({ error: "Class not found" }, { status: 404 });

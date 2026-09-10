@@ -9,9 +9,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Class name is required" }, { status: 400 });
   }
 
-  let classQuery = db.from("classes").select("id, name, class_code").eq("name", class_name.trim());
+  let classQuery = db.from("classes").select("id, name, class_code").ilike("name", class_name.trim());
   if (class_code?.trim()) {
-    classQuery = classQuery.eq("class_code", class_code.trim());
+    classQuery = classQuery.ilike("class_code", class_code.trim());
   }
 
   const { data: classRow, error: classError } = await classQuery.maybeSingle();

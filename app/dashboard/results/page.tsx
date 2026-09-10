@@ -2,17 +2,20 @@
 
 import { useEffect, useState } from "react";
 import DashboardShell from "@/components/DashboardShell";
+import { useToast } from "@/components/ToastProvider";
 
 type TestSummary = { id: string; title: string; status: string; opens_at: string | null; closes_at: string | null; time_limit_minutes: number; submitted_count: number; pending_grading_count: number; ready_to_release_count: number };
 type AttemptRow = { id: string; student_name: string; started_at: string; submitted_at: string | null; status: string; late_seconds: number; result: { total_score: number | null; status: string } | null };
 
 export default function ResultsPage() {
+  const { showToast } = useToast();
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [selectedTestId, setSelectedTestId] = useState("");
   const [attempts, setAttempts] = useState<AttemptRow[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [releasing, setReleasing] = useState(false);
 
   useEffect(() => {
     fetch("/api/tests")
@@ -38,30 +41,49 @@ export default function ResultsPage() {
 
   async function release() {
     setError("");
-    const res = await fetch("/api/results/release", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ attempt_ids: selected }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.error || `Release failed (${res.status})`);
-      return;
-    }
-    if (data.released > 0 && data.skipped_already_released > 0) {
-      setError(`Released ${data.released} result(s). ${data.skipped_already_released} was/were already released.`);
-    } else if (data.released === 0 && data.skipped_already_released > 0) {
-      setError(`${data.skipped_already_released} selected result(s) were already released — nothing new to release.`);
-    } else if (data.message) {
-      setError(data.message);
-    }
-    setSelected([]);
-    if (selectedTestId) {
-      const r = await fetch(`/api/tests/${selectedTestId}/attempts`);
-      if (r.ok) {
-        const d = await r.json();
-        setAttempts(d.attempts ?? []);
+    setReleasing(true);
+    try {
+      const res = await fetch("/api/results/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attempt_ids: selected }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || `Release failed (${res.status})`;
+        setError(msg);
+        showToast(msg, "error");
+        return;
       }
+      if (data.released > 0 && data.skipped_already_released > 0) {
+        const msg = `Released ${data.released} result(s). ${data.skipped_already_released} was/were already released.`;
+        setError(msg);
+        showToast(msg, "success");
+      } else if (data.released === 0 && data.skipped_already_released > 0) {
+        const msg = `${data.skipped_already_released} selected result(s) were already released — nothing new to release.`;
+        setError(msg);
+        showToast(msg, "error");
+      } else if (data.message) {
+        const msg = data.message;
+        setError(msg);
+        showToast(msg, "error");
+      } else if (data.released > 0) {
+        showToast(`Released ${data.released} result(s) successfully`, "success");
+      }
+      setSelected([]);
+      if (selectedTestId) {
+        const r = await fetch(`/api/tests/${selectedTestId}/attempts`);
+        if (r.ok) {
+          const d = await r.json();
+          setAttempts(d.attempts ?? []);
+        }
+      }
+    } catch (e: any) {
+      const msg = e.message || "Network error";
+      setError(msg);
+      showToast(msg, "error");
+    } finally {
+      setReleasing(false);
     }
   }
 
@@ -120,8 +142,8 @@ export default function ResultsPage() {
       </div>
 
       {selected.length > 0 && (
-        <button onClick={release} className="mt-6 rounded-lg bg-rfcm-red text-white font-medium px-4 py-2">
-          Release {selected.length} result(s)
+        <button onClick={release} disabled={releasing} className="mt-6 rounded-lg bg-rfcm-red text-white font-medium px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          {releasing ? "Releasing..." : `Release ${selected.length} result(s)`}
         </button>
       )}
 

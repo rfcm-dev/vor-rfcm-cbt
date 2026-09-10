@@ -65,8 +65,8 @@ export default function StuckAttemptsPage() {
 
       <div className="max-w-3xl space-y-3">
         {items.map((item) => (
-          <div key={item.id} className="bg-white rounded-xl border border-rfcm-yellow-soft p-5 space-y-3">
-            <div className="flex justify-between items-start">
+          <div key={item.id} className="bg-white rounded-xl border border-rfcm-yellow-soft p-4 md:p-5 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
               <div>
                 <p className="font-medium">{item.student_name}</p>
                 <p className="text-xs text-rfcm-charcoal/50">{item.class_name} · {item.test_title}</p>
@@ -74,18 +74,19 @@ export default function StuckAttemptsPage() {
                 <p className="text-xs text-rfcm-red mt-1">{item.answered_count} of {item.total_questions} questions answered before disconnecting</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => setConfirm({ attemptId: item.id, action: "finalize", studentName: item.student_name, answeredCount: item.answered_count })}
-                disabled={item.answered_count === 0}
-                className="rounded-lg bg-rfcm-charcoal text-white text-sm font-medium px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={item.answered_count === 0 || busyId === item.id}
+                className="rounded-lg bg-rfcm-charcoal text-white text-sm font-medium px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={item.answered_count === 0 ? "No answers saved to finalize" : undefined}>
-                Finalize with last saved answers
+                {busyId === item.id ? "Processing..." : "Finalize with last saved answers"}
               </button>
               <button
                 onClick={() => setConfirm({ attemptId: item.id, action: "retake", studentName: item.student_name, answeredCount: item.answered_count })}
-                className="rounded-lg border border-rfcm-yellow-soft text-sm font-medium px-3 py-1.5">
-                Grant a retake instead
+                disabled={busyId === item.id}
+                className="rounded-lg border border-rfcm-yellow-soft text-sm font-medium px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                {busyId === item.id ? "Processing..." : "Grant a retake instead"}
               </button>
             </div>
           </div>
