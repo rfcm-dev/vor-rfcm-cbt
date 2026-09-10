@@ -49,16 +49,17 @@ export default function ResultsPage() {
       return;
     }
     if (data.released === 0) {
-      const debug = data.debug;
-      if (debug && debug.already_released && debug.already_released.length > 0) {
-        setError(`0 new releases — ${debug.already_released.length} selected result(s) were already released.`);
-      } else if (debug && debug.other_statuses && debug.other_statuses.length > 0) {
-        const statuses = [...new Set(debug.other_statuses.map((s: any) => s.status))].join(", ");
-        setError(`0 new releases — selected result(s) have status: ${statuses}`);
+      if (data.skipped_already_released > 0) {
+        setError(`${data.skipped_already_released} selected result(s) were already released — nothing new to release.`);
+      } else if (data.message) {
+        setError(data.message);
       } else {
-        setError("No results were released — they may not be in graded status.");
+        setError("No results were released.");
       }
       return;
+    }
+    if (data.skipped_already_released > 0) {
+      setError(`Released ${data.released} result(s). ${data.skipped_already_released} was/were already released.`);
     }
     setSelected([]);
     if (selectedTestId) {

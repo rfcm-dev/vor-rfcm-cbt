@@ -31,12 +31,11 @@ export async function POST(req: NextRequest) {
   if (gradedIds.length === 0) {
     return NextResponse.json({
       released: 0,
-      debug: {
-        total_matched: matchedBefore?.length ?? 0,
-        already_released: alreadyReleased,
-        other_statuses: otherStatuses,
-        attempted_ids: attempt_ids,
-      },
+      skipped_already_released: alreadyReleased.length,
+      skipped_other: otherStatuses.length,
+      message: alreadyReleased.length > 0
+        ? `${alreadyReleased.length} selected result(s) were already released.`
+        : "No gradable results found among the selected attempts.",
     });
   }
 
@@ -48,5 +47,10 @@ export async function POST(req: NextRequest) {
     .select();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ released: data.length, debug: { graded_ids: gradedIds, updated: data?.map((r: any) => r.attempt_id) ?? [] } });
+  return NextResponse.json({
+    released: data.length,
+    skipped_already_released: alreadyReleased.length,
+    skipped_other: otherStatuses.length,
+    updated_ids: data?.map((r: any) => r.attempt_id) ?? [],
+  });
 }
