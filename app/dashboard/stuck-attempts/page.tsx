@@ -77,7 +77,9 @@ export default function StuckAttemptsPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirm({ attemptId: item.id, action: "finalize", studentName: item.student_name, answeredCount: item.answered_count })}
-                className="rounded-lg bg-rfcm-charcoal text-white text-sm font-medium px-3 py-1.5">
+                disabled={item.answered_count === 0}
+                className="rounded-lg bg-rfcm-charcoal text-white text-sm font-medium px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                title={item.answered_count === 0 ? "No answers saved to finalize" : undefined}>
                 Finalize with last saved answers
               </button>
               <button

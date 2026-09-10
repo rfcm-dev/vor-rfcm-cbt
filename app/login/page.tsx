@@ -40,7 +40,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white rounded-2xl p-8 space-y-5 shadow-xl">
         <div className="flex flex-col items-center mb-2">
           <div className="w-14 h-14 relative mb-2">
-            <Image src="/logo.jpg" alt="RFCM logo" fill className="object-contain rounded-full" />
+            <Image src="/logo.jpg" alt="RFCM logo" fill sizes="56px" className="object-contain rounded-full" />
           </div>
           <h1 className="font-serif text-lg font-bold text-rfcm-charcoal">RFCM CBT — Sign in</h1>
           <p className="text-xs text-rfcm-charcoal/50">Admin &amp; Teacher access</p>
