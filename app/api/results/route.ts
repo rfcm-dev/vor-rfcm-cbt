@@ -20,17 +20,35 @@ export async function GET(req: NextRequest) {
     if (classCode) classQuery = classQuery.eq("class_code", classCode);
 
     const { data: classRow } = await classQuery.maybeSingle();
-    if (!classRow) return NextResponse.json({ error: "Class not found" }, { status: 404 });
+    if (!classRow) {
+      console.log("[results/public] class not found", { className, classCode });
+      return NextResponse.json({ error: "Class not found" }, { status: 404 });
+    }
+    console.log("[results/public] class found", { classId: classRow.id, className, classCode });
 
+    const trimmedName = studentName.trim();
     const { data: students } = await db
       .from("students")
-      .select("id")
+      .select("id, name")
       .eq("class_id", classRow.id)
-      .eq("name", studentName)
-      .limit(1);
+      .ilike("name", trimmedName + "%")
+      .limit(5);
+
+    console.log("[results/public] student lookup", { trimmedName, students });
 
     const student = students?.[0];
-    if (!student) return NextResponse.json([]);
+    if (!student) {
+      return NextResponse.json({
+        error: "Student not found",
+        debug: {
+          class_id: classRow.id,
+          class_name: className,
+          student_name_queried: trimmedName,
+          students_found: students?.length ?? 0,
+          students_sample: students?.slice(0, 5).map((s: any) => s.name) ?? [],
+        }
+      }, { status: 404 });
+    }
 
     const { data: attempts } = await db
       .from("attempts")
@@ -67,8 +85,8 @@ export async function GET(req: NextRequest) {
           class_name: className,
           total_attempts: attempts.length,
           attempt_ids: attempts.map((a: any) => a.id),
-          total_released_results: results.length,
-          released_result_attempt_ids: results.map((r: any) => r.attempt_id),
+          total_released_results: (results ?? []).length,
+          released_result_attempt_ids: (results ?? []).map((r: any) => r.attempt_id),
           matched_attempts: matchedAttempts?.length ?? 0,
           test_ids: testIds,
         }
