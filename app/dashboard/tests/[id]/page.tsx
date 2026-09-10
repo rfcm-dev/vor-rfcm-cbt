@@ -54,6 +54,8 @@ export default function TestDetailPage() {
   const [deleteError, setDeleteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showMine, setShowMine] = useState(false);
+  const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
   async function loadPublishedClasses() {
     const res = await fetch(`/api/tests/${id}/classes`);
@@ -257,6 +259,31 @@ export default function TestDetailPage() {
     }
     showToast("Question deleted");
     setQModal(null);
+    setSelectedQuestions((s) => s.filter((id) => id !== qModal.question!.id));
+    loadQuestions();
+  }
+
+  function toggleQuestion(id: string) {
+    setSelectedQuestions((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  async function bulkDeleteQuestions() {
+    if (selectedQuestions.length === 0) return;
+    if (!confirm(`Delete ${selectedQuestions.length} selected question(s)? This cannot be undone.`)) return;
+    setBulkDeleteLoading(true);
+    const res = await fetch("/api/bulk/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity: "questions", ids: selectedQuestions }),
+    });
+    setBulkDeleteLoading(false);
+    if (!res.ok) {
+      const body = await res.json();
+      showToast(body.error ?? "Bulk delete failed", "error");
+      return;
+    }
+    showToast(`Deleted ${selectedQuestions.length} question(s)`);
+    setSelectedQuestions([]);
     loadQuestions();
   }
 
@@ -411,7 +438,14 @@ export default function TestDetailPage() {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="font-semibold text-sm text-rfcm-charcoal/70">{questions.length} question(s) added</p>
+            <div className="flex items-center gap-3">
+              <p className="font-semibold text-sm text-rfcm-charcoal/70">{questions.length} question(s) added</p>
+              {selectedQuestions.length > 0 && (
+                <button onClick={bulkDeleteQuestions} disabled={bulkDeleteLoading} className="text-xs text-rfcm-red font-medium hover:underline">
+                  {bulkDeleteLoading ? "Deleting..." : `Delete selected (${selectedQuestions.length})`}
+                </button>
+              )}
+            </div>
             <label className="flex items-center gap-2 text-sm text-rfcm-charcoal/70">
               <input type="checkbox" checked={showMine} onChange={(e) => setShowMine(e.target.checked)} />
               Show only mine
@@ -420,14 +454,20 @@ export default function TestDetailPage() {
           {questions.map((q, i) => (
             <div key={q.id} className="bg-white rounded-lg border border-rfcm-yellow-soft p-3 text-sm">
               <div className="flex justify-between items-start">
-                <p className="font-medium flex-1">{i + 1}. {q.content}</p>
+                <label className="flex items-center gap-3 flex-1 cursor-pointer">
+                  <input type="checkbox" checked={selectedQuestions.includes(q.id)} onChange={() => toggleQuestion(q.id)}
+                    className="rounded border-rfcm-yellow-soft" />
+                  <div>
+                    <p className="font-medium">{i + 1}. {q.content}</p>
+                    <p className="text-xs text-rfcm-charcoal/50 mt-1">{q.type} · {q.points} pt(s)</p>
+                    {q.users?.name && <p className="text-xs text-rfcm-charcoal/40 mt-1">Added by {q.users.name}</p>}
+                  </div>
+                </label>
                 <div className="flex gap-2 ml-2">
                   <button onClick={() => startQEdit(q)} className="text-xs text-rfcm-red font-medium hover:underline">Edit</button>
                   <button onClick={() => setQModal({ mode: "delete", question: q })} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
                 </div>
               </div>
-              <p className="text-xs text-rfcm-charcoal/50 mt-1">{q.type} · {q.points} pt(s)</p>
-              {q.users?.name && <p className="text-xs text-rfcm-charcoal/40 mt-1">Added by {q.users.name}</p>}
             </div>
           ))}
         </div>

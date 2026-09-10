@@ -27,6 +27,13 @@ export default function ClassesPage() {
   const [uploadDetails, setUploadDetails] = useState<string[]>([]);
   const [uploadSuccess, setUploadSuccess] = useState<number | null>(null);
 
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
+  function toggleSelect(id: string) {
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
   function load() {
     fetch("/api/classes")
       .then((r) => r.ok ? r.json() : [])
@@ -93,6 +100,27 @@ export default function ClassesPage() {
     showToast("Class deleted");
     setModal(null);
     setError("");
+    setSelected((s) => s.filter((id) => id !== modal.id));
+    load();
+  }
+
+  async function bulkDelete() {
+    if (selected.length === 0) return;
+    if (!confirm(`Delete ${selected.length} selected class(es)? This cannot be undone.`)) return;
+    setBulkDeleteLoading(true);
+    const res = await fetch("/api/bulk/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity: "classes", ids: selected }),
+    });
+    setBulkDeleteLoading(false);
+    if (!res.ok) {
+      const body = await res.json();
+      showToast(body.error ?? "Bulk delete failed", "error");
+      return;
+    }
+    showToast(`Deleted ${selected.length} class(es)`);
+    setSelected([]);
     load();
   }
 
@@ -118,6 +146,31 @@ export default function ClassesPage() {
     showToast(`Added ${body.inserted} class(es)`);
     setUploadSuccess(body.inserted);
     load();
+    e.target.value = "";
+  }
+
+  async function handleStudentUpload(classId: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError("");
+    setUploadDetails([]);
+    setUploadSuccess(null);
+
+    const formData = new FormData();
+    formData.append("class_id", classId);
+    formData.append("file", file);
+
+    const res = await fetch("/api/students/upload", { method: "POST", body: formData });
+    const body = await res.json();
+
+    if (!res.ok) {
+      setUploadError(body.error ?? "Upload failed");
+      setUploadDetails(body.details ?? []);
+      return;
+    }
+
+    showToast(`Added ${body.inserted} student(s)`);
+    setUploadSuccess(body.inserted);
     e.target.value = "";
   }
 
@@ -151,6 +204,20 @@ export default function ClassesPage() {
       </div>
 
       <div className="max-w-md space-y-2">
+        {classes.length > 0 && (
+          <div className="flex items-center gap-2 mb-2">
+            <input type="checkbox" checked={selected.length === classes.length} onChange={() => {
+              if (selected.length === classes.length) setSelected([]);
+              else setSelected(classes.map((c) => c.id));
+            }} className="rounded border-rfcm-yellow-soft" />
+            <span className="text-xs text-rfcm-charcoal/60">Select all</span>
+            {selected.length > 0 && (
+              <button onClick={bulkDelete} disabled={bulkDeleteLoading} className="text-xs text-rfcm-red font-medium hover:underline ml-auto">
+                {bulkDeleteLoading ? "Deleting..." : `Delete selected (${selected.length})`}
+              </button>
+            )}
+          </div>
+        )}
         {classes.map((c) => (
           <div key={c.id} className="bg-white rounded-lg border border-rfcm-yellow-soft p-4">
             {editingId === c.id ? (
@@ -165,15 +232,26 @@ export default function ClassesPage() {
                 </div>
               </form>
             ) : (
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="font-medium">{c.name}</p>
-                  {c.class_code && <p className="text-xs text-rfcm-charcoal/50">Code: {c.class_code}</p>}
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => startEdit(c)} className="text-xs text-rfcm-red font-medium hover:underline">Edit</button>
-                  <button onClick={() => setModal({ mode: "delete", id: c.id, name: c.name })}
-                    className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggleSelect(c.id)}
+                    className="rounded border-rfcm-yellow-soft" />
+                  <div>
+                    <p className="font-medium">{c.name}</p>
+                    {c.class_code && <p className="text-xs text-rfcm-charcoal/50">Code: {c.class_code}</p>}
+                  </div>
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                  <div className="flex gap-2">
+                    <button onClick={() => startEdit(c)} className="text-xs text-rfcm-red font-medium hover:underline">Edit</button>
+                    <button onClick={() => setModal({ mode: "delete", id: c.id, name: c.name })}
+                      className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
+                  </div>
+                  <div className="bg-white rounded-lg border border-rfcm-yellow-soft p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-2">Upload students</p>
+                    <input type="file" accept=".xlsx" onChange={(e) => handleStudentUpload(c.id, e)}
+                      className="w-full text-xs border border-rfcm-yellow-soft rounded-lg px-2 py-1" />
+                  </div>
                 </div>
               </div>
             )}
