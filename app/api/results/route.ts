@@ -45,17 +45,26 @@ export async function GET(req: NextRequest) {
           class_name: className,
           student_name_queried: trimmedName,
           students_found: students?.length ?? 0,
-          students_sample: students?.slice(0, 5).map((s: any) => s.name) ?? [],
+          students_sample: students?.slice(0, 5).map((s: any) => ({ id: s.id, name: s.name })) ?? [],
         }
       }, { status: 404 });
     }
+
+    console.log("[results/public] student matched", { studentId: student.id, studentName: student.name });
 
     const { data: attempts } = await db
       .from("attempts")
       .select("id, test_id")
       .eq("student_id", student.id);
 
-    if (!attempts || attempts.length === 0) return NextResponse.json([]);
+    console.log("[results/public] attempts", { count: attempts?.length ?? 0, ids: attempts?.map((a: any) => a.id) });
+
+    if (!attempts || attempts.length === 0) {
+      return NextResponse.json({
+        error: "No attempts found for this student",
+        debug: { student_id: student.id, student_name: student.name }
+      }, { status: 404 });
+    }
 
     const testIds = [...new Set(attempts.map((a: any) => a.test_id))];
 
@@ -64,6 +73,8 @@ export async function GET(req: NextRequest) {
       .select("*")
       .in("attempt_id", (attempts ?? []).map((a: any) => a.id))
       .eq("status", "released");
+
+    console.log("[results/public] released results", { count: results?.length ?? 0, ids: results?.map((r: any) => r.attempt_id), statuses: results?.map((r: any) => r.status) });
 
     const { data: matchedAttempts } = results?.length
       ? await db.from("attempts").select("id, test_id, student_id").in("id", (results ?? []).map((r: any) => r.attempt_id))
