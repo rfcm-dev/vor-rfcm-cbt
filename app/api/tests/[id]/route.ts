@@ -7,16 +7,15 @@ import { getSessionUser } from "@/lib/session";
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { data, error } = await db
     .from("tests")
-    .select("*, questions(count)")
+    .select("*")
     .eq("id", params.id)
     .single();
 
   if (error || !data) return NextResponse.json({ error: error?.message ?? "Not found" }, { status: 404 });
 
-  const questionCount = (data as any).questions?.count ?? 0;
   const { count } = await db.from("questions").select("*", { count: "exact", head: true }).eq("test_id", params.id);
 
-  return NextResponse.json({ ...data, question_count: count ?? questionCount });
+  return NextResponse.json({ ...data, question_count: count ?? 0 });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

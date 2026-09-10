@@ -13,13 +13,26 @@ export async function GET(req: NextRequest) {
 
   const { data: attempts, error } = await db
     .from("attempts")
-    .select("id, test_id, student_id, started_at, draft_answers, status, students(name, classes(name)), tests(title, time_limit_minutes)")
+    .select("id, test_id, student_id, started_at, draft_answers, status")
     .eq("status", "in_progress")
     .lt("started_at", new Date(now.getTime() - 10 * 60 * 1000).toISOString());
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const testIds = Array.from(new Set((attempts ?? []).map((a: any) => a.test_id)));
+  const testIds = Array.from(new Set((attempts ?? []).map((a: any) => a.test_id).filter(Boolean)));
+  const { data: tests } = testIds.length > 0
+    ? await db.from("tests").select("id, title, time_limit_minutes").in("id", testIds)
+    : { data: [] as any[] };
+
+  const studentIds = Array.from(new Set((attempts ?? []).map((a: any) => a.student_id).filter(Boolean)));
+  const { data: students } = studentIds.length > 0
+    ? await db.from("students").select("id, name, class_id").in("id", studentIds)
+    : { data: [] as any[] };
+  const classIds = Array.from(new Set((students ?? []).map((s: any) => s.class_id).filter(Boolean)));
+  const { data: classes } = classIds.length > 0
+    ? await db.from("classes").select("id, name").in("id", classIds)
+    : { data: [] as any[] };
+
   const { data: questionCounts } = await db
     .from("questions")
     .select("test_id")
@@ -30,18 +43,24 @@ export async function GET(req: NextRequest) {
     countsByTest.set(row.test_id, (countsByTest.get(row.test_id) ?? 0) + 1);
   }
 
+  const testMap = Object.fromEntries((tests ?? []).map((t: any) => [t.id, t]));
+  const studentMap = Object.fromEntries((students ?? []).map((s: any) => [s.id, s]));
+  const classMap = Object.fromEntries((classes ?? []).map((c: any) => [c.id, c]));
+
   const enriched = (attempts ?? []).map((a: any) => {
     const draft = (a.draft_answers ?? {}) as Record<string, string>;
     const answeredCount = Object.values(draft).filter((v) => typeof v === "string" && v.trim()).length;
+    const student = studentMap[a.student_id];
+    const cls = classMap[student?.class_id];
     return {
       id: a.id,
       test_id: a.test_id,
-      test_title: a.tests?.title ?? "Unknown",
-      time_limit_minutes: a.tests?.time_limit_minutes ?? 0,
+      test_title: testMap[a.test_id]?.title ?? "Unknown",
+      time_limit_minutes: testMap[a.test_id]?.time_limit_minutes ?? 0,
       total_questions: countsByTest.get(a.test_id) ?? 0,
       student_id: a.student_id,
-      student_name: a.students?.name ?? "Unknown",
-      class_name: a.students?.classes?.name ?? "",
+      student_name: student?.name ?? "Unknown",
+      class_name: cls?.name ?? "",
       started_at: a.started_at,
       draft_answers: draft,
       answered_count: answeredCount,

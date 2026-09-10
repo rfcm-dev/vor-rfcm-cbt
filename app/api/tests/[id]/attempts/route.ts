@@ -6,11 +6,17 @@ import { db } from "@/lib/db";
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const { data: attempts, error } = await db
     .from("attempts")
-    .select("id, student_id, started_at, submitted_at, status, students(name)")
+    .select("id, student_id, started_at, submitted_at, status")
     .eq("test_id", params.id)
     .order("started_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const studentIds = Array.from(new Set((attempts ?? []).map((a: any) => a.student_id).filter(Boolean)));
+  const { data: students } = studentIds.length > 0
+    ? await db.from("students").select("id, name").in("id", studentIds)
+    : { data: [] as any[] };
+  const studentMap = Object.fromEntries((students ?? []).map((s: any) => [s.id, s]));
 
   const attemptIds = (attempts ?? []).map((a: any) => a.id);
   const { data: results } = attemptIds.length > 0
@@ -21,7 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const enriched = (attempts ?? []).map((a: any) => ({
     id: a.id,
-    student_name: a.students?.name ?? "Unknown",
+    student_name: studentMap[a.student_id]?.name ?? "Unknown",
     started_at: a.started_at,
     submitted_at: a.submitted_at,
     status: a.status,

@@ -11,17 +11,49 @@ export async function GET(req: NextRequest) {
   const testId = req.nextUrl.searchParams.get("test_id");
   const includeGraded = req.nextUrl.searchParams.get("all") === "1" && ["superadmin", "admin"].includes(user?.role ?? "");
 
-  let query = db
-    .from("answers")
-    .select("*, questions!inner(type, content, points, test_id, tests!inner(title)), attempts!inner(student_id, students(name))")
-    .eq("questions.type", "essay");
+  let essayQuestionsQuery = db.from("questions").select("id, test_id, type, content, points").eq("type", "essay");
+  if (testId) essayQuestionsQuery = essayQuestionsQuery.eq("test_id", testId);
+  const { data: essayQuestions } = await essayQuestionsQuery;
+  const essayQuestionIds = Array.from(new Set((essayQuestions ?? []).map((q: any) => q.id).filter(Boolean)));
 
-  if (!includeGraded) query = query.is("manual_score", null);
-  if (testId) query = query.eq("questions.test_id", testId);
-
-  const { data, error } = await query;
+  let answersQuery = db.from("answers").select("*");
+  if (!includeGraded) answersQuery = answersQuery.is("manual_score", null);
+  const { data: answers, error } = essayQuestionIds.length > 0
+    ? await answersQuery.in("question_id", essayQuestionIds)
+    : { data: [] as any[], error: null as any };
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  const attemptIds = Array.from(new Set((answers ?? []).map((a: any) => a.attempt_id).filter(Boolean)));
+  const { data: attempts } = attemptIds.length > 0
+    ? await db.from("attempts").select("id, student_id").in("id", attemptIds)
+    : { data: [] as any[] };
+  const studentIds = Array.from(new Set((attempts ?? []).map((a: any) => a.student_id).filter(Boolean)));
+  const { data: students } = studentIds.length > 0
+    ? await db.from("students").select("id, name").in("id", studentIds)
+    : { data: [] as any[] };
+  const testIds = Array.from(new Set((essayQuestions ?? []).map((q: any) => q.test_id).filter(Boolean)));
+  const { data: tests } = testIds.length > 0
+    ? await db.from("tests").select("id, title").in("id", testIds)
+    : { data: [] as any[] };
+
+  const questionMap = Object.fromEntries((essayQuestions ?? []).map((q: any) => [q.id, q]));
+  const attemptMap = Object.fromEntries((attempts ?? []).map((a: any) => [a.id, a]));
+  const studentMap = Object.fromEntries((students ?? []).map((s: any) => [s.id, s]));
+  const testMap = Object.fromEntries((tests ?? []).map((t: any) => [t.id, t]));
+
+  const enriched = (answers ?? []).map((a: any) => {
+    const question = questionMap[a.question_id];
+    const attempt = attemptMap[a.attempt_id];
+    const student = studentMap[attempt?.student_id];
+    const test = testMap[question?.test_id];
+    return {
+      ...a,
+      questions: question ? { ...question, tests: test ? { ...test } : null } : null,
+      attempts: attempt ? { ...attempt, students: student ? { ...student } : null } : null,
+    };
+  });
+
+  return NextResponse.json(enriched);
 }
 
 export async function POST(req: NextRequest) {
@@ -43,8 +75,13 @@ export async function POST(req: NextRequest) {
   // Recompute the attempt's result once all its essay answers are graded.
   const { data: answer } = await db.from("answers").select("attempt_id").eq("id", answer_id).single();
   if (answer) {
-    const { data: allAnswers } = await db.from("answers").select("*, questions!inner(type)").eq("attempt_id", answer.attempt_id);
-    const stillPending = (allAnswers ?? []).some((a: any) => a.questions.type === "essay" && a.manual_score === null);
+    const { data: allAnswers } = await db.from("answers").select("id, question_id, manual_score").eq("attempt_id", answer.attempt_id);
+    const questionIds = Array.from(new Set((allAnswers ?? []).map((a: any) => a.question_id).filter(Boolean)));
+    const { data: questions } = questionIds.length > 0
+      ? await db.from("questions").select("id, type").in("id", questionIds)
+      : { data: [] as any[] };
+    const questionMap = Object.fromEntries((questions ?? []).map((q: any) => [q.id, q]));
+    const stillPending = (allAnswers ?? []).some((a: any) => questionMap[a.question_id]?.type === "essay" && a.manual_score === null);
 
     if (!stillPending) {
       const total = (allAnswers ?? []).reduce(

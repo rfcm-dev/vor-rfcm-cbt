@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const { data: result, error } = await db
     .from("results")
-    .select("*, attempts!inner(student_id, test_id, students(name, classes(name)), tests(title))")
+    .select("*")
     .eq("attempt_id", attemptId)
     .single();
 
@@ -21,25 +21,61 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "This result has not been released yet" }, { status: 403 });
   }
 
-  const { data: questions } = await db.from("questions").select("points").eq("test_id", result.attempts.test_id);
+  const { data: attempt } = result.attempt_id
+    ? await db.from("attempts").select("id, student_id, test_id").eq("id", result.attempt_id).maybeSingle()
+    : { data: null as any };
+
+  const studentIds = attempt?.student_id ? [attempt.student_id] : [];
+  const { data: students } = studentIds.length > 0
+    ? await db.from("students").select("id, name, class_id").in("id", studentIds)
+    : { data: [] as any[] };
+  const classIds = (students ?? []).map((s: any) => s.class_id).filter(Boolean);
+  const { data: classes } = classIds.length > 0
+    ? await db.from("classes").select("id, name").in("id", classIds)
+    : { data: [] as any[] };
+
+  const testIds = attempt?.test_id ? [attempt.test_id] : [];
+  const { data: tests } = testIds.length > 0
+    ? await db.from("tests").select("id, title").in("id", testIds)
+    : { data: [] as any[] };
+
+  const studentMap = Object.fromEntries((students ?? []).map((s: any) => [s.id, s]));
+  const classMap = Object.fromEntries((classes ?? []).map((c: any) => [c.id, c]));
+  const testMap = Object.fromEntries((tests ?? []).map((t: any) => [t.id, t]));
+
+  const student = studentMap[attempt?.student_id];
+  const cls = classMap[student?.class_id];
+  const test = testMap[attempt?.test_id];
+
+  const enrichedResult = {
+    ...result,
+    attempts: attempt ? {
+      student_id: attempt.student_id,
+      test_id: attempt.test_id,
+      students: student ? { name: student.name, classes: cls ? { name: cls.name } : null } : null,
+      tests: test ? { title: test.title } : null,
+    } : null,
+  };
+
+  const { data: questions } = await db.from("questions").select("points").eq("test_id", enrichedResult.attempts?.test_id ?? "");
   const totalPossible = (questions ?? []).reduce((sum, q) => sum + Number(q.points ?? 0), 0);
-  const percentage = totalPossible > 0 ? Math.round(((result.total_score ?? 0) / totalPossible) * 100) : 0;
+  const percentage = totalPossible > 0 ? Math.round(((enrichedResult.total_score ?? 0) / totalPossible) * 100) : 0;
 
   const buffer = await renderToBuffer(
     ResultDocument({
-      studentName: result.attempts.students.name,
-      className: result.attempts.students.classes?.name ?? "",
-      testTitle: result.attempts.tests.title,
+      studentName: enrichedResult.attempts?.students?.name ?? "",
+      className: enrichedResult.attempts?.students?.classes?.name ?? "",
+      testTitle: enrichedResult.attempts?.tests?.title ?? "",
       percentage,
       grade: scoreToGrade(percentage),
-      releasedAt: new Date(result.released_at).toLocaleDateString(),
+      releasedAt: new Date(enrichedResult.released_at).toLocaleDateString(),
     })
   );
 
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="result-${result.attempts.students.name.replace(/\s+/g, "-")}.pdf"`,
+      "Content-Disposition": `attachment; filename="result-${(enrichedResult.attempts?.students?.name ?? "student").replace(/\s+/g, "-")}.pdf"`,
     },
   });
 }

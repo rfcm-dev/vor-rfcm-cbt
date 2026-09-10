@@ -24,36 +24,55 @@ export async function GET(req: NextRequest) {
 
   const { data: attempts } = await db
     .from("attempts")
-    .select("id, students(name, classes(name))")
+    .select("id, student_id")
     .eq("test_id", testId);
+
+  const studentIds = Array.from(new Set((attempts ?? []).map((a: any) => a.student_id).filter(Boolean)));
+  const { data: students } = studentIds.length > 0
+    ? await db.from("students").select("id, name, class_id").in("id", studentIds)
+    : { data: [] as any[] };
+  const classIds = (students ?? []).map((s: any) => s.class_id).filter(Boolean);
+  const { data: classes } = classIds.length > 0
+    ? await db.from("classes").select("id, name").in("id", classIds)
+    : { data: [] as any[] };
+
+  const studentMap = Object.fromEntries((students ?? []).map((s: any) => [s.id, s]));
+  const classMap = Object.fromEntries((classes ?? []).map((c: any) => [c.id, c]));
 
   const zip = new JSZip();
 
   for (const attempt of attempts ?? []) {
-    const studentName = (attempt as any).students?.name ?? "student";
-    const className = (attempt as any).students?.classes?.name ?? "";
+    const student = studentMap[attempt.student_id];
+    const studentName = student?.name ?? "student";
+    const className = classMap[student?.class_id]?.name ?? "";
     const safeName = studentName.replace(/\s+/g, "-");
 
     if (type === "worksheet") {
       const { data: answers } = await db
         .from("answers")
-        .select("*, questions(content, type, correct_answer, points, order_index)")
+        .select("*")
         .eq("attempt_id", attempt.id);
 
+      const questionIds = Array.from(new Set((answers ?? []).map((a: any) => a.question_id).filter(Boolean)));
+      const { data: questions } = questionIds.length > 0
+        ? await db.from("questions").select("id, content, type, correct_answer, points, order_index").in("id", questionIds)
+        : { data: [] as any[] };
+      const questionMap = Object.fromEntries((questions ?? []).map((q: any) => [q.id, q]));
+
       const sorted = (answers ?? [])
-        .sort((a, b) => (a.questions?.order_index ?? 0) - (b.questions?.order_index ?? 0))
+        .sort((a, b) => (questionMap[a.question_id]?.order_index ?? 0) - (questionMap[b.question_id]?.order_index ?? 0))
         .map((a) => ({
-          content: a.questions?.content ?? "",
-          type: a.questions?.type ?? "",
+          content: questionMap[a.question_id]?.content ?? "",
+          type: questionMap[a.question_id]?.type ?? "",
           response: a.response,
-          correct_answer: a.questions?.correct_answer ?? null,
+          correct_answer: questionMap[a.question_id]?.correct_answer ?? null,
           auto_score: a.auto_score,
           manual_score: a.manual_score,
-          points: a.questions?.points ?? 0,
+          points: questionMap[a.question_id]?.points ?? 0,
         }));
 
       const buffer = await renderToBuffer(
-        WorksheetDocument({ studentName, className, testTitle: test?.title ?? "", answers: sorted })
+        WorksheetDocument({ studentName: studentName, className, testTitle: test?.title ?? "", answers: sorted })
       );
       zip.file(`worksheet-${safeName}.pdf`, buffer);
     } else {
