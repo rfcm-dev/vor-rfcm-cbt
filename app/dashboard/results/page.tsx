@@ -37,19 +37,27 @@ export default function ResultsPage() {
   }, [selectedTestId]);
 
   async function release() {
+    setError("");
     const res = await fetch("/api/results/release", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ attempt_ids: selected }),
     });
-    if (res.ok) {
-      setSelected([]);
-      if (selectedTestId) {
-        const r = await fetch(`/api/tests/${selectedTestId}/attempts`);
-        if (r.ok) {
-          const data = await r.json();
-          setAttempts(data.attempts ?? []);
-        }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || `Release failed (${res.status})`);
+      return;
+    }
+    if (data.released === 0) {
+      setError("No results were released — they may not be in graded status.");
+      return;
+    }
+    setSelected([]);
+    if (selectedTestId) {
+      const r = await fetch(`/api/tests/${selectedTestId}/attempts`);
+      if (r.ok) {
+        const d = await r.json();
+        setAttempts(d.attempts ?? []);
       }
     }
   }
