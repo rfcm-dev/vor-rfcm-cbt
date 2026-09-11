@@ -55,7 +55,14 @@ export default function GradingPage() {
       showToast("Failed to save score", "error");
       return;
     }
-    showToast("Score saved");
+    const data = await res.json().catch(() => ({}));
+    if (data.updated) {
+      showToast("Score saved — result is now graded and ready to release", "success");
+    } else if (data.stillPending) {
+      showToast("Score saved — still waiting for other essay answers", "success");
+    } else {
+      showToast("Score saved", "success");
+    }
     load();
   }
 

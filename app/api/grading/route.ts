@@ -74,26 +74,44 @@ export async function POST(req: NextRequest) {
 
   // Recompute the attempt's result once all its essay answers are graded.
   const { data: answer } = await db.from("answers").select("attempt_id").eq("id", answer_id).single();
-  if (answer) {
-    const { data: allAnswers } = await db.from("answers").select("id, question_id, manual_score").eq("attempt_id", answer.attempt_id);
-    const questionIds = Array.from(new Set((allAnswers ?? []).map((a: any) => a.question_id).filter(Boolean)));
-    const { data: questions } = questionIds.length > 0
-      ? await db.from("questions").select("id, type").in("id", questionIds)
-      : { data: [] as any[] };
-    const questionMap = Object.fromEntries((questions ?? []).map((q: any) => [q.id, q]));
-    const stillPending = (allAnswers ?? []).some((a: any) => questionMap[a.question_id]?.type === "essay" && a.manual_score === null);
+  if (!answer) return NextResponse.json({ ok: true, message: "Score saved, but could not locate attempt" });
 
-    if (!stillPending) {
-      const total = (allAnswers ?? []).reduce(
-        (sum: number, a: any) => sum + (a.manual_score ?? a.auto_score ?? 0),
-        0
-      );
-      await db
-        .from("results")
-        .update({ total_score: total, status: "graded" })
-        .eq("attempt_id", answer.attempt_id);
+  const { data: allAnswers } = await db.from("answers").select("id, question_id, manual_score").eq("attempt_id", answer.attempt_id);
+  const questionIds = Array.from(new Set((allAnswers ?? []).map((a: any) => a.question_id).filter(Boolean)));
+  const { data: questions } = questionIds.length > 0
+    ? await db.from("questions").select("id, type").in("id", questionIds)
+    : { data: [] as any[] };
+  const questionMap = Object.fromEntries((questions ?? []).map((q: any) => [q.id, q]));
+
+  const answersWithScores = (allAnswers ?? []).map((a: any) =>
+    a.id === answer_id ? { ...a, manual_score } : a
+  );
+  const stillPending = answersWithScores.some((a: any) => questionMap[a.question_id]?.type === "essay" && a.manual_score === null);
+
+  let updated = false;
+  let totalScore: number | null = null;
+  if (!stillPending) {
+    totalScore = answersWithScores.reduce(
+      (sum: number, a: any) => sum + (a.manual_score ?? a.auto_score ?? 0),
+      0
+    );
+    const { error: updateError } = await db
+      .from("results")
+      .update({ total_score: totalScore, status: "graded" })
+      .eq("attempt_id", answer.attempt_id);
+
+    if (!updateError) {
+      updated = true;
+    } else {
+      console.error("Failed to update result status after grading", updateError);
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    stillPending,
+    updated,
+    total_score: totalScore,
+    attempt_id: answer.attempt_id,
+  });
 }
