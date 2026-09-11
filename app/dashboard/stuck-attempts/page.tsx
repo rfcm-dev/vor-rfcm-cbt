@@ -18,13 +18,10 @@ type StuckAttempt = {
   answered_count: number;
 };
 
-type ConfirmState = { attemptId: string; action: "finalize" | "retake"; studentName: string; answeredCount: number } | null;
-
 export default function StuckAttemptsPage() {
   const { showToast } = useToast();
   const [items, setItems] = useState<StuckAttempt[]>([]);
   const [loading, setLoading] = useState(false);
-  const [confirm, setConfirm] = useState<ConfirmState>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   function load() {
@@ -38,22 +35,30 @@ export default function StuckAttemptsPage() {
 
   useEffect(load, []);
 
-  async function handleAction() {
-    if (!confirm) return;
-    setBusyId(confirm.attemptId);
-    const res = await fetch("/api/attempts/stuck", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ attempt_id: confirm.attemptId, action: confirm.action }),
-    });
-    setBusyId(null);
-    if (!res.ok) {
-      showToast("Action failed", "error");
-      return;
+  async function handleAction(attemptId: string, action: "finalize" | "retake") {
+    setBusyId(attemptId);
+    try {
+      const res = await fetch("/api/attempts/stuck", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attempt_id: attemptId, action }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || "Action failed", "error");
+        return;
+      }
+      if (action === "finalize") {
+        showToast("Attempt finalized. This cannot be undone.", "success");
+      } else {
+        showToast("Retake granted. The original incomplete attempt remains as a record.", "success");
+      }
+      load();
+    } catch {
+      showToast("Network error — please try again", "error");
+    } finally {
+      setBusyId(null);
     }
-    showToast(confirm.action === "finalize" ? "Attempt finalized" : "Retake granted");
-    setConfirm(null);
-    load();
   }
 
   return (
@@ -76,14 +81,14 @@ export default function StuckAttemptsPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <button
-                onClick={() => setConfirm({ attemptId: item.id, action: "finalize", studentName: item.student_name, answeredCount: item.answered_count })}
+                onClick={() => handleAction(item.id, "finalize")}
                 disabled={item.answered_count === 0 || busyId === item.id}
                 className="rounded-lg bg-rfcm-charcoal text-white text-sm font-medium px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={item.answered_count === 0 ? "No answers saved to finalize" : undefined}>
                 {busyId === item.id ? "Processing..." : "Finalize with last saved answers"}
               </button>
               <button
-                onClick={() => setConfirm({ attemptId: item.id, action: "retake", studentName: item.student_name, answeredCount: item.answered_count })}
+                onClick={() => handleAction(item.id, "retake")}
                 disabled={busyId === item.id}
                 className="rounded-lg border border-rfcm-yellow-soft text-sm font-medium px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 {busyId === item.id ? "Processing..." : "Grant a retake instead"}
@@ -95,27 +100,6 @@ export default function StuckAttemptsPage() {
           <p className="text-sm text-rfcm-charcoal/50">No stuck attempts right now.</p>
         )}
       </div>
-
-      {confirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
-            <h3 className="font-serif text-lg font-bold mb-2">
-              {confirm.action === "finalize" ? "Finalize this exam?" : "Grant a retake?"}
-            </h3>
-            <p className="text-sm text-rfcm-charcoal/70 mb-4">
-              {confirm.action === "finalize"
-                ? `This will score ${confirm.studentName}'s exam using their last autosaved answers (${confirm.answeredCount} questions). This cannot be undone.`
-                : `This will allow ${confirm.studentName} to retake this exam. The original incomplete attempt will remain as a record.`}
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setConfirm(null)} className="flex-1 rounded-md border border-rfcm-yellow-soft py-2 font-medium">Cancel</button>
-              <button onClick={handleAction} disabled={busyId === confirm.attemptId} className="flex-1 rounded-md bg-rfcm-red text-white py-2 font-medium disabled:opacity-50">
-                {busyId === confirm.attemptId ? "Processing..." : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardShell>
   );
 }

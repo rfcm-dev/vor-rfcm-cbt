@@ -87,26 +87,23 @@ export default function ClassesPage() {
     load();
   }
 
-  async function confirmDelete() {
-    if (!modal) return;
-    setBusyId(modal.id);
-    const res = await fetch(`/api/classes/${modal.id}`, { method: "DELETE" });
+  async function handleDelete(id: string) {
+    setBusyId(id);
+    const res = await fetch(`/api/classes/${id}`, { method: "DELETE" });
     setBusyId(null);
     if (!res.ok) {
       const body = await res.json();
       setError(body.error ?? "Failed to delete class");
       return;
     }
-    showToast("Class deleted");
-    setModal(null);
+    showToast("Class deleted. This cannot be undone.");
     setError("");
-    setSelected((s) => s.filter((id) => id !== modal.id));
+    setSelected((s) => s.filter((x) => x !== id));
     load();
   }
 
   async function bulkDelete() {
     if (selected.length === 0) return;
-    if (!confirm(`Delete ${selected.length} selected class(es)? This cannot be undone.`)) return;
     setBulkDeleteLoading(true);
     const res = await fetch("/api/bulk/delete", {
       method: "POST",
@@ -119,7 +116,7 @@ export default function ClassesPage() {
       showToast(body.error ?? "Bulk delete failed", "error");
       return;
     }
-    showToast(`Deleted ${selected.length} class(es)`);
+    showToast(`Deleted ${selected.length} class(es). This cannot be undone.`);
     setSelected([]);
     load();
   }
@@ -244,8 +241,9 @@ export default function ClassesPage() {
                 <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                   <div className="flex gap-2">
                     <button onClick={() => startEdit(c)} className="text-xs text-rfcm-red font-medium hover:underline">Edit</button>
-                    <button onClick={() => setModal({ mode: "delete", id: c.id, name: c.name })}
-                      className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
+                    <button onClick={() => handleDelete(c.id)} disabled={busyId === c.id} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium disabled:opacity-50">
+                      {busyId === c.id ? "Deleting..." : "Delete"}
+                    </button>
                   </div>
                   <div className="bg-white rounded-lg border border-rfcm-yellow-soft p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-2">Upload students</p>
@@ -259,25 +257,6 @@ export default function ClassesPage() {
         ))}
         {classes.length === 0 && <p className="text-rfcm-charcoal/50">No classes yet — add your first one above.</p>}
       </div>
-
-      {modal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
-            <h3 className="font-serif text-lg font-bold mb-2">Delete class?</h3>
-            <p className="text-sm text-rfcm-charcoal/70 mb-4">
-              Are you sure you want to delete <span className="font-semibold">{modal.name}</span>? This cannot be undone.
-            </p>
-            {error && modal.mode === "delete" && <p className="text-sm text-rfcm-red text-center mb-3">{error}</p>}
-            <div className="flex gap-3">
-              <button onClick={() => { setModal(null); setError(""); }} className="flex-1 rounded-md border border-rfcm-yellow-soft py-2 font-medium">Cancel</button>
-              <button onClick={confirmDelete} disabled={busyId === modal.id}
-                className="flex-1 rounded-md bg-rfcm-red text-white py-2 font-medium disabled:opacity-50">
-                {busyId === modal.id ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardShell>
   );
 }

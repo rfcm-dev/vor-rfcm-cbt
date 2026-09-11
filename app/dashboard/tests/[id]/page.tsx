@@ -18,7 +18,7 @@ const TYPES = [
   { value: "essay", label: "Essay" },
 ];
 
-type QuestionModal = { mode: "edit" | "delete"; question: Question } | null;
+type QuestionModal = { mode: "edit"; question: Question } | null;
 
 export default function TestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -250,16 +250,14 @@ export default function TestDetailPage() {
     loadQuestions();
   }
 
-  async function confirmDeleteQ() {
-    if (!qModal?.question) return;
-    const res = await fetch(`/api/questions/${qModal.question.id}`, { method: "DELETE" });
+  async function confirmDeleteQ(question: Question) {
+    const res = await fetch(`/api/questions/${question.id}`, { method: "DELETE" });
     if (!res.ok) {
       showToast("Failed to delete question", "error");
       return;
     }
-    showToast("Question deleted");
-    setQModal(null);
-    setSelectedQuestions((s) => s.filter((id) => id !== qModal.question!.id));
+    showToast("Question deleted. This cannot be undone.");
+    setSelectedQuestions((s) => s.filter((id) => id !== question.id));
     loadQuestions();
   }
 
@@ -269,7 +267,6 @@ export default function TestDetailPage() {
 
   async function bulkDeleteQuestions() {
     if (selectedQuestions.length === 0) return;
-    if (!confirm(`Delete ${selectedQuestions.length} selected question(s)? This cannot be undone.`)) return;
     setBulkDeleteLoading(true);
     const res = await fetch("/api/bulk/delete", {
       method: "POST",
@@ -282,7 +279,7 @@ export default function TestDetailPage() {
       showToast(body.error ?? "Bulk delete failed", "error");
       return;
     }
-    showToast(`Deleted ${selectedQuestions.length} question(s)`);
+    showToast(`Deleted ${selectedQuestions.length} question(s). This cannot be undone.`);
     setSelectedQuestions([]);
     loadQuestions();
   }
@@ -465,7 +462,7 @@ export default function TestDetailPage() {
                 </label>
                 <div className="flex gap-2 ml-2">
                   <button onClick={() => startQEdit(q)} className="text-xs text-rfcm-red font-medium hover:underline">Edit</button>
-                  <button onClick={() => setQModal({ mode: "delete", question: q })} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
+                  <button onClick={() => confirmDeleteQ(q)} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
                 </div>
               </div>
             </div>
@@ -493,19 +490,6 @@ export default function TestDetailPage() {
               <button type="button" onClick={() => setQModal(null)} className="flex-1 rounded-md border border-rfcm-yellow-soft py-2 font-medium">Cancel</button>
             </div>
           </form>
-        </div>
-      )}
-
-      {qModal?.mode === "delete" && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
-            <h3 className="font-serif text-lg font-bold mb-2">Delete question?</h3>
-            <p className="text-sm text-rfcm-charcoal/70 mb-4">This cannot be undone. Student answers to this question will remain in the record.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setQModal(null)} className="flex-1 rounded-md border border-rfcm-yellow-soft py-2 font-medium">Cancel</button>
-              <button onClick={confirmDeleteQ} className="flex-1 rounded-md bg-rfcm-red text-white py-2 font-medium">Delete</button>
-            </div>
-          </div>
         </div>
       )}
     </DashboardShell>

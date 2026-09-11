@@ -14,8 +14,6 @@ export default function TestsPage() {
   const { showToast } = useToast();
   const [tests, setTests] = useState<Test[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
@@ -45,26 +43,8 @@ export default function TestsPage() {
     }
   }
 
-  async function confirmDelete() {
-    if (!deleteTarget) return;
-    setBusy(true);
-    const res = await fetch(`/api/tests/${deleteTarget}`, { method: "DELETE" });
-    setBusy(false);
-    if (!res.ok) {
-      const body = await res.json();
-      setDeleteError(body.error ?? "Failed to delete exam");
-      return;
-    }
-    showToast("Examination deleted");
-    setDeleteTarget(null);
-    setDeleteError("");
-    setSelected((s) => s.filter((id) => id !== deleteTarget));
-    load();
-  }
-
   async function bulkDelete() {
     if (selected.length === 0) return;
-    if (!confirm(`Delete ${selected.length} selected examination(s)? This cannot be undone.`)) return;
     setBulkDeleteLoading(true);
     const res = await fetch("/api/bulk/delete", {
       method: "POST",
@@ -77,7 +57,7 @@ export default function TestsPage() {
       showToast(body.error ?? "Bulk delete failed", "error");
       return;
     }
-    showToast(`Deleted ${selected.length} examination(s)`);
+    showToast(`Deleted ${selected.length} examination(s). This cannot be undone.`);
     setSelected([]);
     load();
   }
@@ -120,31 +100,11 @@ export default function TestsPage() {
             </label>
             <div className="flex items-center gap-3 ml-4">
               <span className="text-sm text-rfcm-charcoal/60">{t.status} · {t.time_limit_minutes}m</span>
-              <button onClick={() => setDeleteTarget(t.id)} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
             </div>
           </div>
         ))}
         {tests.length === 0 && <p className="text-rfcm-charcoal/50">No examinations yet — create your first one.</p>}
       </div>
-
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
-            <h3 className="font-serif text-lg font-bold mb-2">Delete examination?</h3>
-            <p className="text-sm text-rfcm-charcoal/70 mb-4">
-              Are you sure you want to delete <span className="font-semibold">{tests.find((t) => t.id === deleteTarget)?.title}</span>? This cannot be undone.
-            </p>
-            {deleteError && <p className="text-sm text-rfcm-red text-center mb-3">{deleteError}</p>}
-            <div className="flex gap-3">
-              <button onClick={() => { setDeleteTarget(null); setDeleteError(""); }} className="flex-1 rounded-md border border-rfcm-yellow-soft py-2 font-medium">Cancel</button>
-              <button onClick={confirmDelete} disabled={busy}
-                className="flex-1 rounded-md bg-rfcm-red text-white py-2 font-medium disabled:opacity-50">
-                {busy ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </DashboardShell>
   );
 }
