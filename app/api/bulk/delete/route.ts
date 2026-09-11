@@ -20,16 +20,19 @@ export async function POST(req: NextRequest) {
   const table = db.from(entity as any);
 
   if (entity === "classes") {
-    const { data: linked } = await db.from("test_classes").select("class_id").in("class_id", ids).limit(1);
+    const { data: linked } = await db.from("test_classes").select("class_id, test_id").in("class_id", ids).limit(1);
     if (linked && linked.length > 0) {
-      return NextResponse.json({ error: "One or more selected classes are linked to exams — remove them first" }, { status: 409 });
+      const testIds = linked.map((l: any) => l.test_id);
+      const { data: tests } = await db.from("tests").select("id, title").in("id", testIds);
+      const blockedNames = (tests ?? []).map((t: any) => t.title).filter(Boolean);
+      return NextResponse.json({ error: `Cannot delete: these classes are still published to exam(s): ${blockedNames.join(", ")}. Remove the class from those exams first.` }, { status: 409 });
     }
   }
 
   if (entity === "tests") {
-    const { data: attempts } = await db.from("attempts").select("id").in("test_id", ids).limit(1);
+    const { data: attempts } = await db.from("attempts").select("id, test_id").in("test_id", ids).limit(1);
     if (attempts && attempts.length > 0) {
-      return NextResponse.json({ error: "One or more selected exams have student attempts" }, { status: 409 });
+      return NextResponse.json({ error: "Cannot delete: one or more selected exams have student attempts. Unpublish them instead." }, { status: 409 });
     }
     await db.from("test_classes").delete().in("test_id", ids);
     await db.from("questions").delete().in("test_id", ids);
@@ -38,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (entity === "questions") {
     const { data: answers } = await db.from("answers").select("id").in("question_id", ids).limit(1);
     if (answers && answers.length > 0) {
-      return NextResponse.json({ error: "One or more selected questions have student answers" }, { status: 409 });
+      return NextResponse.json({ error: "Cannot delete: one or more selected questions have student answers." }, { status: 409 });
     }
   }
 
