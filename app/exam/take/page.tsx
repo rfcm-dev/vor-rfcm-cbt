@@ -230,8 +230,9 @@ function TakeExamInner() {
 
   const q = questions[current];
   const answeredCount = Object.keys(answers).filter((id) => answers[id]?.trim()).length;
-  const minutes = secondsLeft !== null ? Math.floor(secondsLeft / 60) : null;
-  const seconds = secondsLeft !== null ? secondsLeft % 60 : null;
+  const totalSeconds = secondsLeft !== null ? Math.max(0, Math.round(secondsLeft)) : 0;
+  const minutes = totalSeconds > 0 ? Math.floor(totalSeconds / 60) : 0;
+  const seconds = totalSeconds % 60;
   const timeLow = secondsLeft !== null && secondsLeft <= 300;
   const progress = questions.length > 0 ? ((current + 1) / questions.length) * 100 : 0;
 

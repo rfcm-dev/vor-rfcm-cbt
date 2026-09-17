@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ToastProvider } from "./ToastProvider";
+import { ToastProvider, useToast } from "./ToastProvider";
 import { useEffect, useState } from "react";
 
 const NAV = [
@@ -17,6 +17,43 @@ const NAV = [
   { href: "/dashboard/question-submissions", label: "Submit Questions", icon: "M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" },
   { href: "/dashboard/admins", label: "Admins & Teachers", icon: "M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-3.625-3.568 4.125 4.125 0 00-3.568 3.625 9.337 9.337 0 00-.952 4.121 9.38 9.38 0 00.372 2.625m0 0a9.38 9.38 0 00.372 2.625M15 19.128v.003" },
 ];
+
+function LogoutButton() {
+  const { showToast } = useToast();
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogout() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (res.ok) {
+        showToast("Signed out successfully", "info");
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 800);
+      } else {
+        showToast("Failed to sign out", "error");
+      }
+    } catch {
+      showToast("Network error — please try again", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleLogout}
+      disabled={loading}
+      className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+      </svg>
+      {loading ? "Signing out..." : "Sign out"}
+    </button>
+  );
+}
 
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -86,6 +123,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                     </Link>
                   );
                 })}
+                <LogoutButton />
               </nav>
             </aside>
           </div>
@@ -121,7 +159,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               </nav>
             </div>
             <div className="mt-auto p-6 border-t border-white/10">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 mb-3">
                 <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-rfcm-yellow">
                   {name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
@@ -132,6 +170,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   </span>
                 </div>
               </div>
+              <LogoutButton />
             </div>
           </aside>
           <main className="flex-1 p-4 md:p-8 overflow-y-auto">{children}</main>

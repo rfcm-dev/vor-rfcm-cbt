@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
   const { data: answer } = await db.from("answers").select("attempt_id").eq("id", answer_id).single();
   if (!answer) return NextResponse.json({ ok: true, message: "Score saved, but could not locate attempt" });
 
-  const { data: allAnswers } = await db.from("answers").select("id, question_id, manual_score").eq("attempt_id", answer.attempt_id);
+  const { data: allAnswers } = await db.from("answers").select("id, question_id, manual_score, auto_score").eq("attempt_id", answer.attempt_id);
   const questionIds = Array.from(new Set((allAnswers ?? []).map((a: any) => a.question_id).filter(Boolean)));
   const { data: questions } = questionIds.length > 0
     ? await db.from("questions").select("id, type").in("id", questionIds)
