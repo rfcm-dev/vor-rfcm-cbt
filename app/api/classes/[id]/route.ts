@@ -26,15 +26,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data: linked } = await db
-    .from("test_classes")
-    .select("test_id")
-    .eq("class_id", params.id)
-    .limit(1);
-
-  if (linked && linked.length > 0) {
-    return NextResponse.json({ error: `This class has ${linked.length} exam(s) linked to it — remove it from those exams first` }, { status: 409 });
-  }
+  const { error: tcError } = await db.from("test_classes").delete().eq("class_id", params.id);
+  if (tcError) return NextResponse.json({ error: tcError.message }, { status: 500 });
 
   const { error } = await db.from("classes").delete().eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

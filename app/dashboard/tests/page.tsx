@@ -18,6 +18,9 @@ export default function TestsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
 
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   function load() {
     Promise.all([
       fetch("/api/tests").then((r) => r.ok ? r.json() : []),
@@ -41,6 +44,22 @@ export default function TestsPage() {
     } else {
       setSelected(tests.map((t) => t.id));
     }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
+    const res = await fetch(`/api/tests/${deleteTarget}`, { method: "DELETE" });
+    setDeleteLoading(false);
+    if (!res.ok) {
+      const body = await res.json();
+      showToast(body.error ?? "Failed to delete exam", "error");
+      return;
+    }
+    showToast("Examination deleted");
+    setDeleteTarget(null);
+    setSelected((s) => s.filter((id) => id !== deleteTarget));
+    load();
   }
 
   async function bulkDelete() {
@@ -100,11 +119,30 @@ export default function TestsPage() {
             </label>
             <div className="flex items-center gap-3 ml-4">
               <span className="text-sm text-rfcm-charcoal/60">{t.status} · {t.time_limit_minutes}m</span>
+              <Link href={`/dashboard/tests/${t.id}`} className="text-xs text-rfcm-red font-medium hover:underline">Edit</Link>
+              <button onClick={() => setDeleteTarget(t.id)} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
             </div>
           </div>
         ))}
         {tests.length === 0 && <p className="text-rfcm-charcoal/50">No examinations yet — create your first one.</p>}
       </div>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
+            <h3 className="font-serif text-lg font-bold mb-2">Delete examination?</h3>
+            <p className="text-sm text-rfcm-charcoal/70 mb-4">
+              Are you sure you want to delete <span className="font-semibold">{tests.find((t) => t.id === deleteTarget)?.title}</span>? This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => { setDeleteTarget(null); }} className="flex-1 rounded-md border border-rfcm-yellow-soft py-2 font-medium">Cancel</button>
+              <button onClick={confirmDelete} disabled={deleteLoading} className="flex-1 rounded-md bg-rfcm-red text-white py-2 font-medium disabled:opacity-50">
+                {deleteLoading ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardShell>
   );
 }

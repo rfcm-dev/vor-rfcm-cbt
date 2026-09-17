@@ -11,14 +11,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: "Superadmin only" }, { status: 403 });
   }
 
-  const { role, password } = await req.json();
+  const { name, role, password, permissions } = await req.json();
 
   const updateData: any = {};
+  if (name && typeof name === "string") {
+    updateData.name = name.trim();
+  }
   if (role && ["superadmin", "admin", "executive", "teacher"].includes(role)) {
     updateData.role = role;
   }
   if (password) {
     updateData.password_hash = await hashPassword(password);
+  }
+  if (permissions && typeof permissions === "object") {
+    updateData.permissions = permissions;
   }
 
   if (Object.keys(updateData).length === 0) {
@@ -29,7 +35,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .from("users")
     .update(updateData)
     .eq("id", params.id)
-    .select("id, name, role, created_at")
+    .select("id, name, role, created_at, permissions")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -10,11 +10,16 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const formData = await req.formData();
-  const classId = formData.get("class_id") as string | null;
+  const classId = String(formData.get("class_id") || "").trim();
   const file = formData.get("file") as File | null;
 
   if (!classId || !file) {
     return NextResponse.json({ error: "class_id and file are required" }, { status: 400 });
+  }
+
+  const { data: classRow } = await db.from("classes").select("id, name, class_code").eq("id", classId).maybeSingle();
+  if (!classRow) {
+    return NextResponse.json({ error: "Class not found" }, { status: 404 });
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -24,7 +29,7 @@ export async function POST(req: NextRequest) {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
   } catch {
-    return NextResponse.json({ error: "Could not read that file — make sure it's a .xlsx" }, { status: 400 });
+    return NextResponse.json({ error: "Could not read that file — make sure it's a .xlsx using the template" }, { status: 400 });
   }
 
   const { data: existingStudents } = await db.from("students").select("name, class_id").eq("class_id", classId);
@@ -35,14 +40,27 @@ export async function POST(req: NextRequest) {
 
   rows.forEach((row, i) => {
     const rowNum = i + 2;
-    const name = String(row["Student Name"] ?? "").trim();
+    const name = String(row["Name"] ?? "").trim();
+    const className = String(row["Class"] ?? "").trim();
+    const classCode = String(row["Class Code (optional)"] ?? "").trim();
+    const teacherName = String(row["Teacher Name (optional)"] ?? "").trim();
 
-    if (!name) { errors.push(`Row ${rowNum}: Student Name is required`); return; }
+    if (!name) { errors.push(`Row ${rowNum}: Name is required`); return; }
+    if (!className) { errors.push(`Row ${rowNum}: Class is required`); return; }
+
+    if (className.toLowerCase() !== classRow.name.toLowerCase()) {
+      errors.push(`Row ${rowNum}: Class "${className}" does not match selected class "${classRow.name}"`); return;
+    }
+
+    if (classCode && classRow.class_code && classRow.class_code.toLowerCase() !== classCode.toLowerCase()) {
+      errors.push(`Row ${rowNum}: Class code does not match`); return;
+    }
+
     if (seenNames.has(name.toLowerCase())) { errors.push(`Row ${rowNum}: Duplicate name "${name}" within the file`); return; }
     if (existingNames.has(name.toLowerCase())) { errors.push(`Row ${rowNum}: Student "${name}" already exists in this class`); return; }
 
     seenNames.add(name.toLowerCase());
-    toInsert.push({ class_id: classId, name, student_code: row["Student Code (optional)"] ? String(row["Student Code (optional)"]).trim() : null });
+    toInsert.push({ class_id: classId, name, teacher_name: teacherName || null });
   });
 
   if (errors.length > 0) {

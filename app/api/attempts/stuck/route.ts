@@ -4,33 +4,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { autoScore } from "@/lib/scoring";
+import { getAttemptOverview } from "@/lib/attempt-overview";
 
 export async function GET(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const now = new Date();
+  const attempts = await getAttemptOverview({ stuckOnly: true });
 
-  const { data: attempts, error } = await db
-    .from("attempts")
-    .select("id, test_id, student_id, started_at, draft_answers, status")
-    .eq("status", "in_progress")
-    .lt("started_at", new Date(now.getTime() - 10 * 60 * 1000).toISOString());
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const testIds = Array.from(new Set((attempts ?? []).map((a: any) => a.test_id).filter(Boolean)));
+  const testIds = Array.from(new Set(attempts.map((a) => a.test_id).filter(Boolean)));
   const { data: tests } = testIds.length > 0
     ? await db.from("tests").select("id, title, time_limit_minutes").in("id", testIds)
-    : { data: [] as any[] };
-
-  const studentIds = Array.from(new Set((attempts ?? []).map((a: any) => a.student_id).filter(Boolean)));
-  const { data: students } = studentIds.length > 0
-    ? await db.from("students").select("id, name, class_id").in("id", studentIds)
-    : { data: [] as any[] };
-  const classIds = Array.from(new Set((students ?? []).map((s: any) => s.class_id).filter(Boolean)));
-  const { data: classes } = classIds.length > 0
-    ? await db.from("classes").select("id, name").in("id", classIds)
     : { data: [] as any[] };
 
   const { data: questionCounts } = await db
@@ -44,23 +28,19 @@ export async function GET(req: NextRequest) {
   }
 
   const testMap = Object.fromEntries((tests ?? []).map((t: any) => [t.id, t]));
-  const studentMap = Object.fromEntries((students ?? []).map((s: any) => [s.id, s]));
-  const classMap = Object.fromEntries((classes ?? []).map((c: any) => [c.id, c]));
 
-  const enriched = (attempts ?? []).map((a: any) => {
+  const enriched = attempts.map((a) => {
     const draft = (a.draft_answers ?? {}) as Record<string, string>;
     const answeredCount = Object.values(draft).filter((v) => typeof v === "string" && v.trim()).length;
-    const student = studentMap[a.student_id];
-    const cls = classMap[student?.class_id];
     return {
-      id: a.id,
+      id: a.attempt_id,
       test_id: a.test_id,
       test_title: testMap[a.test_id]?.title ?? "Unknown",
       time_limit_minutes: testMap[a.test_id]?.time_limit_minutes ?? 0,
       total_questions: countsByTest.get(a.test_id) ?? 0,
       student_id: a.student_id,
-      student_name: student?.name ?? "Unknown",
-      class_name: cls?.name ?? "",
+      student_name: a.student_name ?? "Unknown",
+      class_name: a.class_name ?? "",
       started_at: a.started_at,
       draft_answers: draft,
       answered_count: answeredCount,

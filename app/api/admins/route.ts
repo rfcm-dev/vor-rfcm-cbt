@@ -15,9 +15,14 @@ export async function GET() {
     return NextResponse.json({ error: "Superadmin or admin only" }, { status: 403 });
   }
 
-  const { data, error } = await db.from("users").select("id, name, role, created_at").order("created_at");
+  const { data, error } = await db.from("users").select("id, name, role, created_at, permissions").order("created_at");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  const visible = user.role === "superadmin"
+    ? data
+    : (data ?? []).filter((u: any) => u.role !== "superadmin");
+
+  return NextResponse.json(visible);
 }
 
 export async function POST(req: NextRequest) {
@@ -26,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Superadmin or admin only" }, { status: 403 });
   }
 
-  const { name, password, role } = await req.json();
+  const { name, password, role, permissions } = await req.json();
   if (!name || !password || !["admin", "executive", "teacher"].includes(role)) {
     return NextResponse.json({ error: "name, password, and a valid role are required" }, { status: 400 });
   }
@@ -38,8 +43,8 @@ export async function POST(req: NextRequest) {
   const password_hash = await hashPassword(password);
   const { data, error } = await db
     .from("users")
-    .insert({ name, password_hash, role })
-    .select("id, name, role, created_at")
+    .insert({ name, password_hash, role, permissions: permissions ?? {} })
+    .select("id, name, role, created_at, permissions")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

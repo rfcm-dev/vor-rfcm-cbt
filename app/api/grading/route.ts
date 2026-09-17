@@ -24,32 +24,34 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const attemptIds = Array.from(new Set((answers ?? []).map((a: any) => a.attempt_id).filter(Boolean)));
-  const { data: attempts } = attemptIds.length > 0
-    ? await db.from("attempts").select("id, student_id").in("id", attemptIds)
-    : { data: [] as any[] };
-  const studentIds = Array.from(new Set((attempts ?? []).map((a: any) => a.student_id).filter(Boolean)));
-  const { data: students } = studentIds.length > 0
-    ? await db.from("students").select("id, name").in("id", studentIds)
-    : { data: [] as any[] };
-  const testIds = Array.from(new Set((essayQuestions ?? []).map((q: any) => q.test_id).filter(Boolean)));
-  const { data: tests } = testIds.length > 0
-    ? await db.from("tests").select("id, title").in("id", testIds)
+  const { data: overviewRows } = attemptIds.length > 0
+    ? await db.from("attempt_overview").select("*").in("attempt_id", attemptIds)
     : { data: [] as any[] };
 
-  const questionMap = Object.fromEntries((essayQuestions ?? []).map((q: any) => [q.id, q]));
-  const attemptMap = Object.fromEntries((attempts ?? []).map((a: any) => [a.id, a]));
-  const studentMap = Object.fromEntries((students ?? []).map((s: any) => [s.id, s]));
-  const testMap = Object.fromEntries((tests ?? []).map((t: any) => [t.id, t]));
+  const overviewMap = new Map((overviewRows ?? []).map((r: any) => [r.attempt_id, r]));
 
   const enriched = (answers ?? []).map((a: any) => {
-    const question = questionMap[a.question_id];
-    const attempt = attemptMap[a.attempt_id];
-    const student = studentMap[attempt?.student_id];
-    const test = testMap[question?.test_id];
+    const overview = overviewMap.get(a.attempt_id);
+    const question = essayQuestions?.find((q: any) => q.id === a.question_id);
     return {
       ...a,
-      questions: question ? { ...question, tests: test ? { ...test } : null } : null,
-      attempts: attempt ? { ...attempt, students: student ? { ...student } : null } : null,
+      questions: question
+        ? {
+            ...question,
+            tests: overview
+              ? {
+                  title: overview.test_title,
+                }
+              : null,
+          }
+        : null,
+      attempts: overview
+        ? {
+            students: {
+              name: overview.student_name,
+            },
+          }
+        : null,
     };
   });
 

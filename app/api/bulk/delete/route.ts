@@ -17,35 +17,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid entity" }, { status: 400 });
   }
 
-  const table = db.from(entity as any);
-
   if (entity === "classes") {
-    const { data: linked } = await db.from("test_classes").select("class_id, test_id").in("class_id", ids).limit(1);
-    if (linked && linked.length > 0) {
-      const testIds = linked.map((l: any) => l.test_id);
-      const { data: tests } = await db.from("tests").select("id, title").in("id", testIds);
-      const blockedNames = (tests ?? []).map((t: any) => t.title).filter(Boolean);
-      return NextResponse.json({ error: `Cannot delete: these classes are still published to exam(s): ${blockedNames.join(", ")}. Remove the class from those exams first.` }, { status: 409 });
-    }
+    const { error: tcError } = await db.from("test_classes").delete().in("class_id", ids);
+    if (tcError) return NextResponse.json({ error: tcError.message }, { status: 500 });
+
+    const { error: studentError } = await db.from("students").delete().in("class_id", ids);
+    if (studentError) return NextResponse.json({ error: studentError.message }, { status: 500 });
+
+    const { error } = await db.from("classes").delete().in("id", ids);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ deleted: ids.length });
   }
 
   if (entity === "tests") {
-    const { data: attempts } = await db.from("attempts").select("id, test_id").in("test_id", ids).limit(1);
-    if (attempts && attempts.length > 0) {
-      return NextResponse.json({ error: "Cannot delete: one or more selected exams have student attempts. Unpublish them instead." }, { status: 409 });
+    const attemptIds = (await db.from("attempts").select("id").in("test_id", ids)).data?.map((a: any) => a.id) ?? [];
+    if (attemptIds.length > 0) {
+      await db.from("answers").delete().in("attempt_id", attemptIds);
+      await db.from("results").delete().in("attempt_id", attemptIds);
+      await db.from("attempts").delete().in("id", attemptIds);
     }
     await db.from("test_classes").delete().in("test_id", ids);
     await db.from("questions").delete().in("test_id", ids);
+    const { error } = await db.from("tests").delete().in("id", ids);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ deleted: ids.length });
   }
 
   if (entity === "questions") {
-    const { data: answers } = await db.from("answers").select("id").in("question_id", ids).limit(1);
-    if (answers && answers.length > 0) {
-      return NextResponse.json({ error: "Cannot delete: one or more selected questions have student answers." }, { status: 409 });
-    }
+    await db.from("answers").delete().in("question_id", ids);
+    const { error } = await db.from("questions").delete().in("id", ids);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ deleted: ids.length });
   }
 
-  const { error } = await table.delete().in("id", ids);
+  const { error } = await db.from(entity).delete().in("id", ids);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ deleted: ids.length });
 }

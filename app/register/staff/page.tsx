@@ -1,38 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useToast } from "@/components/ToastProvider";
 
-// Admin/teacher sign-in. Deliberately has no link from any student-facing page —
-// reachable only if you know the URL, keeping the "two worlds" separation.
-export default function LoginPage() {
+export default function StaffRegisterPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [role, setRole] = useState("teacher");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.role) router.push("/dashboard");
+      })
+      .catch(() => {});
+  }, [router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, password }),
+      body: JSON.stringify({ name, password, role }),
     });
 
     setLoading(false);
+    const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      const body = await res.json();
-      setError(body.error ?? "Login failed");
+      setError(data.error ?? "Registration failed");
       return;
     }
 
-    router.push("/dashboard");
+    showToast("Account created. You can now sign in.");
+    router.push("/login");
   }
 
   return (
@@ -42,8 +53,8 @@ export default function LoginPage() {
           <div className="w-14 h-14 relative mb-2">
             <Image src="/logo.jpg" alt="RFCM logo" fill sizes="56px" className="object-contain rounded-full" />
           </div>
-          <h1 className="font-serif text-lg font-bold text-rfcm-charcoal">RFCM CBT — Sign in</h1>
-          <p className="text-xs text-rfcm-charcoal/50">Admin &amp; Teacher access</p>
+          <h1 className="font-serif text-lg font-bold text-rfcm-charcoal">RFCM CBT — Create account</h1>
+          <p className="text-xs text-rfcm-charcoal/50">Staff self-registration</p>
         </div>
 
         <div className="space-y-1">
@@ -54,18 +65,28 @@ export default function LoginPage() {
 
         <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60">Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
             className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2 outline-none focus:border-rfcm-red" />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60">Role</label>
+          <select value={role} onChange={(e) => setRole(e.target.value)}
+            className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2 outline-none focus:border-rfcm-red">
+            <option value="teacher">Teacher</option>
+            <option value="executive">Executive</option>
+          </select>
         </div>
 
         {error && <p className="text-sm text-rfcm-red">{error}</p>}
 
         <button type="submit" disabled={loading}
           className="w-full rounded-lg bg-rfcm-red hover:bg-rfcm-red-dark text-white font-semibold py-2.5 disabled:opacity-60">
-          {loading ? "Signing in..." : "Sign in"}
+          {loading ? "Creating account..." : "Create account"}
         </button>
+
         <p className="text-xs text-rfcm-charcoal/50 text-center">
-          Need an account? <a href="/register/staff" className="text-rfcm-red font-medium hover:underline">Create one</a>
+          Already have an account? <a href="/login" className="text-rfcm-red font-medium hover:underline">Sign in</a>
         </p>
       </form>
     </main>
