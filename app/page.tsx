@@ -1,236 +1,178 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import StudentLayout from "@/components/StudentLayout";
-import ExamCard from "@/components/ExamCard";
-import PrimaryButton from "@/components/PrimaryButton";
 
-type ClassOption = { id: string; name: string; class_code: string | null };
-type StudentOption = { id: string; name: string; teacher_name: string | null; photo_url: string | null };
+type Role = "student" | "staff" | "admin";
 
-const STEPS = [
-  { key: "class", label: "Class", description: "Select your class" },
-  { key: "student", label: "Name", description: "Enter your name" },
-  { key: "profile", label: "Confirm", description: "Verify your profile" },
-] as const;
+const ROLES: { key: Role; label: string; subtitle: string; href: string; color: string; icon: string }[] = [
+  {
+    key: "student",
+    label: "I'm a Student",
+    subtitle: "Register once, then take your examination",
+    href: "#",
+    color: "from-blue-500 to-blue-600",
+    icon: "M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422A12.083 12.083 0 0112 21.5a12.083 12.083 0 01-6.16-10.922L12 14z M12 14l9-5-9-5-9 5 9 5z",
+  },
+  {
+    key: "staff",
+    label: "I'm a Staff",
+    subtitle: "Executive or Teacher portal",
+    href: "/login",
+    color: "from-emerald-500 to-emerald-600",
+    icon: "M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z M16 7a2 2 0 012 2v1h1a1 1 0 011 1v3a1 1 0 01-1 1h-1v1a2 2 0 01-2 2H8a2 2 0 01-2-2v-1H5a1 1 0 01-1-1v-3a1 1 0 011-1h1V9a2 2 0 012-2h8z",
+  },
+  {
+    key: "admin",
+    label: "Admin",
+    subtitle: "Superadmin and Admin center",
+    href: "/login",
+    color: "from-rfcm-red to-rfcm-red-dark",
+    icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+  },
+];
 
-export default function StudentLandingPage() {
+export default function LandingPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"class" | "student" | "profile">("class");
-  const [classes, setClasses] = useState<ClassOption[]>([]);
-  const [classId, setClassId] = useState("");
-  const [classCode, setClassCode] = useState("");
-  const [students, setStudents] = useState<StudentOption[]>([]);
-  const [studentName, setStudentName] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
-  const [resolvedTestId, setResolvedTestId] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [classesLoaded, setClassesLoaded] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    fetch("/api/classes")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setClasses)
-      .catch(() => setClasses([]))
-      .finally(() => setClassesLoaded(true));
+    setMounted(true);
   }, []);
 
-  async function resolveClass() {
-    setLoading(true);
-    setError("");
-    const res = await fetch("/api/exam/resolve", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_name: classes.find((c) => c.id === classId)?.name, class_code: classCode }),
-    });
-    setLoading(false);
-    if (!res.ok) {
-      const body = await res.json();
-      setError(body.error ?? "Something went wrong");
-      return;
-    }
-    const body = await res.json();
-    if (body.test?.id) setResolvedTestId(body.test.id);
-    const studentRes = await fetch(`/api/students/lookup?class_id=${classId}`);
-    if (studentRes.ok) {
-      setStudents(await studentRes.json());
-    }
-    setStep("student");
-  }
-
-  async function lookupStudent() {
-    if (!studentName.trim()) return;
-    setLoading(true);
-    setError("");
-    const res = await fetch("/api/students/lookup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ class_id: classId, student_name: studentName }),
-    });
-    setLoading(false);
-    if (!res.ok) {
-      const body = await res.json();
-      setError(body.error ?? "Something went wrong");
-      return;
-    }
-    const { student } = await res.json();
-    setSelectedStudent(student);
-    setStep("profile");
-  }
-
-  function confirmProfile() {
-    if (!selectedStudent) return;
-    router.push(`/exam/instructions?test_id=${resolvedTestId}&student_id=${selectedStudent.id}`);
-  }
-
-  function startOver() {
-    setSelectedStudent(null);
-    setStudentName("");
-    setError("");
-    setStep("student");
-  }
-
-  const currentStepIndex = STEPS.findIndex((s) => s.key === step);
-
   return (
-    <StudentLayout>
-      <ExamCard className="max-w-md">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            {STEPS.map((s, i) => (
-              <div key={s.key} className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                  i <= currentStepIndex
-                    ? "bg-rfcm-red text-white shadow-lg shadow-rfcm-red/30"
-                    : "bg-rfcm-cream-dark text-rfcm-charcoal/40"
-                }`}>
-                  {i + 1}
-                </div>
-                <p className={`text-[10px] mt-1 font-medium uppercase tracking-wide ${
-                  i <= currentStepIndex ? "text-rfcm-red" : "text-rfcm-charcoal/40"
-                }`}>{s.label}</p>
-              </div>
-            ))}
+    <div className="min-h-screen flex flex-col bg-rfcm-cream">
+      {/* Header */}
+      <header className="w-full bg-white/80 backdrop-blur-md border-b border-rfcm-yellow-soft sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="relative w-12 h-12 md:w-14 md:h-14">
+              <Image
+                src="/logo.jpg"
+                alt="RFCM logo"
+                fill
+                sizes="56px"
+                className="object-contain rounded-full"
+                priority
+              />
+            </div>
+            <div>
+              <p className="text-[10px] md:text-xs tracking-[0.15em] uppercase text-rfcm-red font-semibold">
+                Reconciled Family of Christ Mission
+              </p>
+              <h1 className="font-serif text-xl md:text-2xl font-bold text-rfcm-charcoal leading-tight">
+                RFCM CBT
+              </h1>
+              <p className="text-[10px] md:text-xs text-rfcm-charcoal/60">Sunday School Examination</p>
+            </div>
           </div>
-          <div className="h-1 bg-rfcm-cream-dark rounded-full overflow-hidden">
-            <div
-              className="h-full bg-rfcm-red transition-all duration-500 ease-out"
-              style={{ width: `${((currentStepIndex + 1) / STEPS.length) * 100}%` }}
-            />
+          <div className="hidden md:block">
+            <span className="text-xs text-rfcm-charcoal/50">© {new Date().getFullYear()} RFCM IT Department</span>
           </div>
         </div>
+      </header>
 
-        {step === "class" && (
-          <form onSubmit={(e) => { e.preventDefault(); resolveClass(); }} className="space-y-5">
-            <div>
-              <h2 className="font-serif text-xl font-bold text-center mb-1">Select Your Class</h2>
-              <p className="text-xs text-rfcm-charcoal/60 text-center">Choose the class you belong to</p>
-            </div>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/70">Class</label>
-                <div className="relative">
-                  <select value={classId} onChange={(e) => setClassId(e.target.value)} required
-                    className="w-full rounded-xl border border-rfcm-yellow-soft bg-rfcm-cream-dark/50 px-4 py-3 outline-none focus:border-rfcm-red focus:ring-2 focus:ring-rfcm-red/20 transition-all appearance-none">
-                    <option value="">Select class</option>
-                    {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.class_code ? `(${c.class_code})` : ""}</option>)}
-                  </select>
-                  <svg className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-rfcm-charcoal/40 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/70">Class Code <span className="font-normal normal-case">(optional)</span></label>
-                <input value={classCode} onChange={(e) => setClassCode(e.target.value)}
-                  className="w-full rounded-xl border border-rfcm-yellow-soft bg-rfcm-cream-dark/50 px-4 py-3 outline-none focus:border-rfcm-red focus:ring-2 focus:ring-rfcm-red/20 transition-all"
-                  placeholder="Enter class code if provided" />
-              </div>
-            </div>
-            {error && (
-              <div className="bg-rfcm-red/10 border border-rfcm-red/20 rounded-xl p-3 animate-pulse">
-                <p className="text-sm text-rfcm-red text-center">{error}</p>
-              </div>
-            )}
-            <PrimaryButton disabled={loading || !classId} type="submit">
-              {loading ? "Checking..." : "Continue"}
-            </PrimaryButton>
-            <p className="text-xs text-rfcm-charcoal/50 text-center">
-              Already checked your result? <a href="/check-results" className="text-rfcm-red font-medium hover:underline transition-colors">Check My Result</a>
-            </p>
-          </form>
-        )}
+      {/* Hero */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 md:py-20">
+        <div className={`text-center mb-12 md:mb-16 transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+          <h2 className="font-serif text-3xl md:text-5xl font-bold text-rfcm-charcoal mb-4">
+            Welcome to <span className="text-rfcm-red">RFCM CBT</span>
+          </h2>
+          <p className="text-sm md:text-base text-rfcm-charcoal/60 max-w-xl mx-auto">
+            Choose your portal below to get started. Students can register and take examinations. Staff and Admin can sign in to manage the system.
+          </p>
+        </div>
 
-        {step === "student" && (
-          <form onSubmit={(e) => { e.preventDefault(); lookupStudent(); }} className="space-y-5">
-            <div>
-              <h2 className="font-serif text-xl font-bold text-center mb-1">Enter Your Name</h2>
-              <p className="text-xs text-rfcm-charcoal/60 text-center">Type your full name as registered</p>
-            </div>
-            <div className="space-y-1.5 pt-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/70">Full Name</label>
-              <input
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                required
-                list="student-names"
-                className="w-full rounded-xl border border-rfcm-yellow-soft bg-rfcm-cream-dark/50 px-4 py-3 outline-none focus:border-rfcm-red focus:ring-2 focus:ring-rfcm-red/20 transition-all"
-                placeholder="e.g. John Doe"
-              />
-              <datalist id="student-names">
-                {students.map((s) => <option key={s.id} value={s.name} />)}
-              </datalist>
-            </div>
-            {error && (
-              <div className="bg-rfcm-red/10 border border-rfcm-red/20 rounded-xl p-3 animate-pulse">
-                <p className="text-sm text-rfcm-red text-center">{error}</p>
-              </div>
-            )}
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => setStep("class")} className="flex-1 rounded-xl border border-rfcm-yellow-soft py-3 font-medium hover:bg-rfcm-cream-dark transition-colors">Back</button>
-              <PrimaryButton disabled={loading || !studentName.trim()} type="submit" className="flex-1">
-                {loading ? "Checking..." : "Continue"}
-              </PrimaryButton>
-            </div>
-          </form>
-        )}
-
-        {step === "profile" && selectedStudent && (
-          <div className="text-center space-y-5">
-            <div>
-              <h2 className="font-serif text-xl font-bold">Is this you?</h2>
-              <p className="text-xs text-rfcm-charcoal/60 mt-1">Confirm your identity before starting</p>
-            </div>
-            <div className="flex flex-col items-center gap-4">
-              <div className="relative">
-                {selectedStudent.photo_url ? (
-                  <img src={selectedStudent.photo_url} alt={selectedStudent.name} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg" />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-rfcm-red to-rfcm-red-dark flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-                    {selectedStudent.name.charAt(0).toUpperCase()}
+        {/* Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl w-full">
+          {ROLES.map((role, idx) => {
+            if (role.key === "student") {
+              return (
+                <div
+                  key={role.key}
+                  className={`bg-white rounded-3xl border border-rfcm-yellow-soft p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                  style={{ transitionDelay: `${idx * 150}ms` }}
+                >
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${role.color} flex items-center justify-center mb-6 shadow-lg`}>
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={role.icon} />
+                    </svg>
                   </div>
-                )}
-                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-4 border-white flex items-center justify-center">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  <h3 className="font-serif text-xl font-bold text-rfcm-charcoal mb-2">
+                    {role.label}
+                  </h3>
+                  <p className="text-sm text-rfcm-charcoal/60 mb-6">{role.subtitle}</p>
+                  <div className="space-y-3">
+                    <a
+                      href="/register"
+                      className="flex items-center justify-center gap-2 w-full rounded-xl bg-rfcm-red text-white text-sm font-semibold py-3 hover:bg-rfcm-red-dark transition-colors"
+                    >
+                      Register
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </a>
+                    <a
+                      href="/student"
+                      className="flex items-center justify-center gap-2 w-full rounded-xl border border-rfcm-yellow-soft text-rfcm-charcoal text-sm font-semibold py-3 hover:bg-rfcm-cream-dark transition-colors"
+                    >
+                      Take Exam
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                      </svg>
+                    </a>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <a
+                key={role.key}
+                href={role.href}
+                className={`group relative bg-white rounded-3xl border border-rfcm-yellow-soft p-8 shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+                style={{ transitionDelay: `${idx * 150}ms` }}
+              >
+                <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${role.color} flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={role.icon} />
                   </svg>
                 </div>
-              </div>
-              <div>
-                <p className="font-semibold text-lg text-rfcm-charcoal">{selectedStudent.name}</p>
-                <p className="text-sm text-rfcm-charcoal/60">{classes.find((c) => c.id === classId)?.name}</p>
-                {selectedStudent.teacher_name && <p className="text-sm text-rfcm-charcoal/50">Teacher: {selectedStudent.teacher_name}</p>}
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button onClick={startOver} className="flex-1 rounded-xl border border-rfcm-yellow-soft py-3 font-medium hover:bg-rfcm-cream-dark transition-colors">Not you? Start over</button>
-              <PrimaryButton onClick={confirmProfile} className="flex-1">Continue</PrimaryButton>
-            </div>
-          </div>
-        )}
-      </ExamCard>
-    </StudentLayout>
+                <h3 className="font-serif text-xl font-bold text-rfcm-charcoal mb-2 group-hover:text-rfcm-red transition-colors">
+                  {role.label}
+                </h3>
+                <p className="text-sm text-rfcm-charcoal/60 mb-6">{role.subtitle}</p>
+                <div className="flex items-center text-sm font-medium text-rfcm-red group-hover:gap-2 transition-all">
+                  <span>Sign In</span>
+                  <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+
+        {/* Security note */}
+        <div className={`mt-12 md:mt-16 text-center transition-all duration-700 delay-500 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+          <p className="text-xs text-rfcm-charcoal/40">
+            Admin access is restricted. Direct login is available at <a href="/login" className="text-rfcm-red font-medium hover:underline">/login</a>
+          </p>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="w-full bg-white/60 backdrop-blur-sm border-t border-rfcm-yellow-soft py-6">
+        <div className="max-w-6xl mx-auto px-4 text-center">
+          <p className="text-xs text-rfcm-charcoal/50">
+            © {new Date().getFullYear()} Reconciled Family of Christ Mission. All rights reserved.
+          </p>
+          <p className="text-[10px] text-rfcm-charcoal/40 mt-1">
+            Designed and developed by RFCM IT Department @2026
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 }

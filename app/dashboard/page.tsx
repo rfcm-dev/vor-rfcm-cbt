@@ -13,6 +13,8 @@ type Summary = {
   total_exams: number;
 };
 
+type UserInfo = { name: string; role: string };
+
 const STATS = [
   { key: "open_exams_count", label: "Open exams", href: "/dashboard/tests", color: "text-rfcm-red", suffix: undefined as ((s: Summary) => string) | undefined },
   { key: "pending_grading_count", label: "Pending grading", href: "/dashboard/grading", color: "text-amber-600", suffix: undefined as ((s: Summary) => string) | undefined },
@@ -33,15 +35,36 @@ const ACTIONS = [
   { href: "/dashboard/admins", label: "Admins & Teachers", description: "Manage accounts and permissions" },
 ];
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function getRoleDisplayName(role: string) {
+  const roleNames: Record<string, string> = {
+    superadmin: "Superadmin",
+    admin: "Admin",
+    executive: "Executive",
+    teacher: "Teacher",
+  };
+  return roleNames[role] || role;
+}
+
 export default function DashboardHome() {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard/summary")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        setSummary(data);
+    Promise.all([
+      fetch("/api/dashboard/summary").then((r) => r.ok ? r.json() : null),
+      fetch("/api/auth/me").then((r) => r.ok ? r.json() : null),
+    ])
+      .then(([summaryData, userData]) => {
+        setSummary(summaryData);
+        setUser(userData);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -50,8 +73,23 @@ export default function DashboardHome() {
   return (
     <DashboardShell>
       <div className="mb-8">
-        <h1 className="font-serif text-2xl font-bold text-rfcm-charcoal">Dashboard</h1>
-        <p className="text-sm text-rfcm-charcoal/60 mt-1">Welcome back! Here's what's happening today.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="font-serif text-2xl md:text-3xl font-bold text-rfcm-charcoal">
+              {loading ? "Dashboard" : `${getGreeting()}, ${user?.name || "User"}`}
+            </h1>
+            <p className="text-sm text-rfcm-charcoal/60 mt-1">
+              {loading ? "Loading..." : `Here's what's happening today${user?.role ? ` · ${getRoleDisplayName(user.role)}` : ""}`}
+            </p>
+          </div>
+          {!loading && user && (
+            <div className="hidden md:block">
+              <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-rfcm-red/10 text-rfcm-red border border-rfcm-red/20">
+                {getRoleDisplayName(user.role)}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

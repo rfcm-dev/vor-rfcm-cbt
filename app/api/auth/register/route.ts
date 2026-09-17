@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
   const allowedRoles = ["teacher", "executive"];
   const selectedRole = allowedRoles.includes(role) ? role : "teacher";
 
-  const existing = await db.from("users").select("id").eq("name", name).maybeSingle();
+  const trimmedName = name.trim().toUpperCase();
+  const existing = await db.from("users").select("id").ilike("name", trimmedName).maybeSingle();
   if (existing.data) {
     return NextResponse.json({ error: "A user with this name already exists" }, { status: 409 });
   }
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
   const password_hash = await hashPassword(password);
   const { data, error } = await db
     .from("users")
-    .insert({ name, password_hash, role: selectedRole })
+    .insert({ name: trimmedName, password_hash, role: selectedRole })
     .select("id, name, role, created_at")
     .single();
 

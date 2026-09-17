@@ -15,7 +15,7 @@ function getSupabase(): SupabaseClient | null {
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const name = String(formData.get("name") || "").trim();
+    const name = String(formData.get("name") || "").trim().toUpperCase();
     const classId = String(formData.get("class_id") || "").trim();
     const classCode = String(formData.get("class_code") || "").trim();
     const teacherName = String(formData.get("teacher_name") || "").trim();

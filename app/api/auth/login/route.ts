@@ -11,10 +11,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Name and password are required" }, { status: 400 });
   }
 
+  const trimmedName = name.trim();
   const { data: user, error } = await db
     .from("users")
     .select("id, name, password_hash, role")
-    .eq("name", name)
+    .ilike("name", trimmedName)
     .single();
 
   if (error || !user) {

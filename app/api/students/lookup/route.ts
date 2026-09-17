@@ -22,14 +22,7 @@ export async function POST(req: NextRequest) {
 
   if (existing) return NextResponse.json({ student: existing });
 
-  const { data: created, error } = await db
-    .from("students")
-    .insert({ class_id, name: student_name, student_code: student_code || null })
-    .select()
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ student: created });
+  return NextResponse.json({ error: "Student not found. Please register first." }, { status: 404 });
 }
 
 // Admin: search students (optionally filtered by class and query)

@@ -20,6 +20,7 @@ export default function StudentsPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [profileStudent, setProfileStudent] = useState<Student | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [uploadDetails, setUploadDetails] = useState<string[]>([]);
   const [uploadSuccess, setUploadSuccess] = useState<number | null>(null);
@@ -244,6 +245,7 @@ export default function StudentsPage() {
                       </form>
                     ) : (
                       <>
+                        <button onClick={() => setProfileStudent(s)} className="text-xs text-rfcm-charcoal/70 hover:text-rfcm-red font-medium px-2 py-1 rounded-md hover:bg-rfcm-red/5 transition-colors">View</button>
                         <button onClick={() => startEdit(s)} className="text-xs text-rfcm-red font-medium hover:underline px-2 py-1 rounded-md hover:bg-rfcm-red/5 transition-colors">Edit</button>
                         <button onClick={() => setDeleteTarget(s.id)} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium px-2 py-1 rounded-md hover:bg-rfcm-red/5 transition-colors">Delete</button>
                       </>
@@ -269,6 +271,36 @@ export default function StudentsPage() {
               <button onClick={confirmDelete} disabled={deleteLoading} className="flex-1 rounded-xl bg-rfcm-red text-white py-2.5 font-medium disabled:opacity-50 hover:bg-rfcm-red-dark transition-colors">
                 {deleteLoading ? "Deleting..." : "Delete"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profileStudent && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-serif text-xl font-bold text-rfcm-charcoal">Student Profile</h3>
+              <button onClick={() => setProfileStudent(null)} className="text-rfcm-charcoal/40 hover:text-rfcm-charcoal transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col items-center gap-4">
+              {profileStudent.photo_url ? (
+                <img src={profileStudent.photo_url} alt={profileStudent.name} className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg" />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-rfcm-red to-rfcm-red-dark flex items-center justify-center text-3xl font-bold text-white shadow-lg">
+                  {profileStudent.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="text-center">
+                <p className="font-semibold text-lg text-rfcm-charcoal">{profileStudent.name}</p>
+                <p className="text-sm text-rfcm-charcoal/60">{profileStudent.class_name}</p>
+                {profileStudent.class_code && <p className="text-xs text-rfcm-charcoal/50">Code: {profileStudent.class_code}</p>}
+                <p className="text-sm text-rfcm-charcoal/50 mt-1">Teacher: {profileStudent.teacher_name || "Not assigned"}</p>
+              </div>
             </div>
           </div>
         </div>

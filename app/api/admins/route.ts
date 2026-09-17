@@ -40,10 +40,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only the superadmin can create additional admin accounts." }, { status: 403 });
   }
 
+  const trimmedName = name.trim().toUpperCase();
+  const existing = await db.from("users").select("id").ilike("name", trimmedName).maybeSingle();
+  if (existing.data) {
+    return NextResponse.json({ error: "A user with this name already exists" }, { status: 409 });
+  }
+
   const password_hash = await hashPassword(password);
   const { data, error } = await db
     .from("users")
-    .insert({ name, password_hash, role, permissions: permissions ?? {} })
+    .insert({ name: trimmedName, password_hash, role, permissions: permissions ?? {} })
     .select("id, name, role, created_at, permissions")
     .single();
 
