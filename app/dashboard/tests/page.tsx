@@ -20,6 +20,18 @@ export default function TestsPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    Promise.all([
+      fetch("/api/tests").then((r) => r.ok ? r.json() : []),
+      fetch("/api/classes").then((r) => r.ok ? r.json() : []),
+    ]).then(([testsData, classesData]) => {
+      setTests(testsData);
+      setClasses(classesData);
+    }).catch(() => { setTests([]); setClasses([]); });
+  }, []);
 
   function load() {
     Promise.all([
@@ -30,7 +42,6 @@ export default function TestsPage() {
       setClasses(classesData);
     }).catch(() => { setTests([]); setClasses([]); });
   }
-  useEffect(load, []);
 
   const classMap = Object.fromEntries(classes.map((c) => [c.id, c.name]));
 
@@ -106,8 +117,8 @@ export default function TestsPage() {
             <span className="text-xs text-rfcm-charcoal/60">Select all</span>
           </div>
         )}
-        {tests.map((t) => (
-          <div key={t.id} className="bg-white rounded-xl border border-rfcm-yellow-soft p-4 flex justify-between items-center hover:border-rfcm-red transition-colors">
+        {tests.map((t, idx) => (
+          <div key={t.id} className={`bg-white rounded-xl border border-rfcm-yellow-soft p-4 flex justify-between items-center hover:border-rfcm-red transition-colors ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${idx + 1}`}>
             <label className="flex items-center gap-3 flex-1 cursor-pointer">
               <input type="checkbox" checked={selected.includes(t.id)} onChange={() => toggleSelect(t.id)}
                 className="rounded border-rfcm-yellow-soft" />
@@ -128,8 +139,8 @@ export default function TestsPage() {
       </div>
 
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 animate-modal-backdrop">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center animate-modal-content">
             <h3 className="font-serif text-lg font-bold mb-2">Delete examination?</h3>
             <p className="text-sm text-rfcm-charcoal/70 mb-4">
               Are you sure you want to delete <span className="font-semibold">{tests.find((t) => t.id === deleteTarget)?.title}</span>? This cannot be undone.

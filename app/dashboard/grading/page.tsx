@@ -21,6 +21,11 @@ export default function GradingPage() {
   const [items, setItems] = useState<PendingAnswer[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function load() {
     const params = new URLSearchParams();
@@ -82,8 +87,8 @@ export default function GradingPage() {
       {Object.entries(grouped).map(([examTitle, examItems]) => (
         <div key={examTitle} className="space-y-4">
           <h2 className="font-serif text-lg font-bold text-rfcm-charcoal">{examTitle}</h2>
-          {examItems.map((item) => (
-            <div key={item.id} className="bg-white rounded-xl border border-rfcm-yellow-soft p-5 space-y-3">
+          {examItems.map((item, idx) => (
+            <div key={item.id} className={`bg-white rounded-xl border border-rfcm-yellow-soft p-5 space-y-3 ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${(idx % 6) + 1}`}>
               <p className="text-xs text-rfcm-charcoal/50">{item.attempts?.students?.name}</p>
               <p>{item.questions.content}</p>
               <p className="text-sm text-rfcm-charcoal/60 border-l-2 border-rfcm-yellow-soft pl-3">{item.response}</p>

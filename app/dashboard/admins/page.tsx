@@ -144,8 +144,13 @@ export default function AdminsPage() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteState>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const isSuperadmin = currentUserRole === "superadmin";
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function load() {
     setPageLoading(true);
@@ -323,8 +328,8 @@ export default function AdminsPage() {
         <LoadingSkeleton />
       ) : (
         <div className="grid gap-4">
-          {admins.map((a) => (
-            <div key={a.id} className="bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md transition-all">
+          {admins.map((a, idx) => (
+            <div key={a.id} className={`bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md transition-all ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${idx + 1}`}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-rfcm-cream-dark flex items-center justify-center text-sm font-bold text-rfcm-charcoal">
@@ -360,8 +365,8 @@ export default function AdminsPage() {
       )}
 
       {edit && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 backdrop-blur-sm">
-          <form onSubmit={saveEdit} className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 backdrop-blur-sm animate-modal-backdrop">
+          <form onSubmit={saveEdit} className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-6 animate-modal-content">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-serif text-xl font-bold text-rfcm-charcoal">Edit user</h3>
@@ -435,8 +440,8 @@ export default function AdminsPage() {
       )}
 
       {resetTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 backdrop-blur-sm">
-          <form onSubmit={(e) => { e.preventDefault(); confirmReset(); }} className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 backdrop-blur-sm animate-modal-backdrop">
+          <form onSubmit={(e) => { e.preventDefault(); confirmReset(); }} className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl space-y-4 animate-modal-content">
             <h3 className="font-serif text-xl font-bold text-rfcm-charcoal">Reset password</h3>
             <p className="text-sm text-rfcm-charcoal/70">Resetting password for <span className="font-semibold text-rfcm-charcoal">{resetTarget.name}</span></p>
             <input type="text" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New temporary password" required minLength={6}
@@ -453,8 +458,8 @@ export default function AdminsPage() {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl text-center space-y-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-10 backdrop-blur-sm animate-modal-backdrop">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full shadow-2xl text-center space-y-4 animate-modal-content">
             <h3 className="font-serif text-xl font-bold text-rfcm-charcoal">Delete user?</h3>
             <p className="text-sm text-rfcm-charcoal/70">
               Are you sure you want to delete <span className="font-semibold text-rfcm-charcoal">{deleteTarget.name}</span>? This cannot be undone.

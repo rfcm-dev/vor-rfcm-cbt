@@ -23,6 +23,11 @@ export default function StuckAttemptsPage() {
   const [items, setItems] = useState<StuckAttempt[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function load() {
     setLoading(true);
@@ -69,8 +74,8 @@ export default function StuckAttemptsPage() {
       {loading && <p className="text-sm text-rfcm-charcoal/60">Loading...</p>}
 
       <div className="max-w-3xl space-y-3">
-        {items.map((item) => (
-          <div key={item.id} className="bg-white rounded-xl border border-rfcm-yellow-soft p-4 md:p-5 space-y-3">
+        {items.map((item, idx) => (
+          <div key={item.id} className={`bg-white rounded-xl border border-rfcm-yellow-soft p-4 md:p-5 space-y-3 ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${idx + 1}`}>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
               <div>
                 <p className="font-medium">{item.student_name}</p>

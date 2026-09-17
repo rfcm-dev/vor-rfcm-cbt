@@ -9,7 +9,7 @@ export default function PrimaryButton(
   return (
     <button
       {...rest}
-      className={`w-full rounded-xl bg-rfcm-red hover:bg-rfcm-red-dark text-white font-semibold py-3.5 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${className}`}
+      className={`w-full rounded-xl bg-rfcm-red hover:bg-rfcm-red-dark text-white font-semibold py-3.5 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-[0.97] ${className}`}
     >
       {isLoading && (
         <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

@@ -31,6 +31,11 @@ export default function ResultsPage() {
   const [leaderboardClassFilter, setLeaderboardClassFilter] = useState("");
   const [leaderboardTestFilter, setLeaderboardTestFilter] = useState("");
   const [leaderboardSort, setLeaderboardSort] = useState<"score_desc" | "score_asc" | "name_asc">("score_desc");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const testId = searchParams.get("test_id");
@@ -199,8 +204,8 @@ export default function ResultsPage() {
 
           <div className="max-w-2xl space-y-2">
             {loading && <p className="text-sm text-rfcm-charcoal/60">Loading attempts...</p>}
-            {!loading && attempts.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 bg-white rounded-lg border border-rfcm-yellow-soft p-3">
+            {!loading && attempts.map((a, idx) => (
+              <div key={a.id} className={`flex items-center gap-3 bg-white rounded-lg border border-rfcm-yellow-soft p-3 ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${idx + 1}`}>
                 <span className="flex-1">
                   <span className="font-medium">{a.student_name}</span>
                   <span className="text-xs text-rfcm-charcoal/50 ml-2">
@@ -311,7 +316,7 @@ export default function ResultsPage() {
                     <tr key="empty"><td colSpan={9} className="px-4 py-3 text-rfcm-charcoal/50">No released results found.</td></tr>
                   )}
                   {sortedLeaderboard.map((r, idx) => (
-                    <tr key={r.attempt_id} className="border-t border-rfcm-yellow-soft">
+                    <tr key={r.attempt_id} className={`border-t border-rfcm-yellow-soft ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${(idx % 6) + 1}`}>
                       <td className="px-4 py-2 font-medium">{idx + 1}</td>
                       <td className="px-4 py-2 font-medium">{r.student_name}</td>
                       <td className="px-4 py-2 text-rfcm-charcoal/70">{r.class_name}</td>

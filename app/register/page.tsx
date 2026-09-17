@@ -58,7 +58,7 @@ export default function RegisterPage() {
 
   return (
     <StudentLayout>
-      <div className="max-w-md mx-auto bg-white rounded-2xl border border-rfcm-yellow-soft p-6 md:p-8">
+      <div className="max-w-md mx-auto bg-white rounded-2xl border border-rfcm-yellow-soft p-6 md:p-8 animate-fade-in-up">
         <h2 className="font-serif text-xl font-bold text-center mb-1">Student Registration</h2>
         <p className="text-xs text-rfcm-charcoal/60 text-center mb-6">Register once per class. Your photo is optional.</p>
 
@@ -82,7 +82,7 @@ export default function RegisterPage() {
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Class</label>
               <select value={classId} onChange={(e) => setClassId(e.target.value)} required
-                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red">
+                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red transition-colors">
                 <option value="">Select class</option>
                 {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -91,19 +91,19 @@ export default function RegisterPage() {
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Class Code (optional)</label>
               <input value={classCode} onChange={(e) => setClassCode(e.target.value)}
-                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red" />
+                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red transition-colors" />
             </div>
 
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Full Name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required
-                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red" />
+                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red transition-colors" />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Teacher&apos;s Name (optional)</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Teacher's Name (optional)</label>
               <input value={teacherName} onChange={(e) => setTeacherName(e.target.value)}
-                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red" />
+                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red transition-colors" />
             </div>
 
             <div>
@@ -113,7 +113,7 @@ export default function RegisterPage() {
             </div>
 
             {error && <p className="text-sm text-rfcm-red text-center">{error}</p>}
-            <button type="submit" disabled={loading} className="w-full rounded-lg bg-rfcm-red text-white font-medium py-2 disabled:opacity-50">
+            <button type="submit" disabled={loading} className="w-full rounded-lg bg-rfcm-red text-white font-medium py-2 disabled:opacity-50 transition-all active:scale-[0.98]">
               {loading ? "Saving..." : "Save profile"}
             </button>
           </form>

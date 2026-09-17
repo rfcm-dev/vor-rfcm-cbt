@@ -29,6 +29,11 @@ export default function ClassesPage() {
 
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   function load() {
     setLoading(true);
@@ -247,8 +252,8 @@ export default function ClassesPage() {
           )}
 
           <div className="grid gap-3">
-            {classes.map((c) => (
-              <div key={c.id} className="bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md hover:border-rfcm-red/30 transition-all">
+            {classes.map((c, idx) => (
+              <div key={c.id} className={`bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md hover:border-rfcm-red/30 transition-all ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${idx + 1}`}>
                 {editingId === c.id ? (
                   <form onSubmit={saveEdit} className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

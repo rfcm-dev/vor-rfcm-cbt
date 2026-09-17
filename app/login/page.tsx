@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -12,6 +12,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +42,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-rfcm-charcoal px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white rounded-2xl p-8 space-y-5 shadow-xl">
+      <form onSubmit={handleSubmit} className={`w-full max-w-sm bg-white rounded-2xl p-8 space-y-5 shadow-xl transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
         <div className="flex flex-col items-center mb-2">
           <div className="w-14 h-14 relative mb-2">
             <Image src="/logo.jpg" alt="RFCM logo" fill sizes="56px" className="object-contain rounded-full" />
@@ -49,19 +54,19 @@ export default function LoginPage() {
         <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60">Name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} required
-            className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2 outline-none focus:border-rfcm-red" />
+            className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2 outline-none focus:border-rfcm-red transition-colors" />
         </div>
 
         <div className="space-y-1">
           <label className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60">Password</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-            className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2 outline-none focus:border-rfcm-red" />
+            className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2 outline-none focus:border-rfcm-red transition-colors" />
         </div>
 
         {error && <p className="text-sm text-rfcm-red">{error}</p>}
 
         <button type="submit" disabled={loading}
-          className="w-full rounded-lg bg-rfcm-red hover:bg-rfcm-red-dark text-white font-semibold py-2.5 disabled:opacity-60">
+          className="w-full rounded-lg bg-rfcm-red hover:bg-rfcm-red-dark text-white font-semibold py-2.5 disabled:opacity-60 transition-all active:scale-[0.98]">
           {loading ? "Signing in..." : "Sign in"}
         </button>
         <p className="text-xs text-rfcm-charcoal/50 text-center">

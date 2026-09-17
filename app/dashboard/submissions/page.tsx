@@ -32,6 +32,11 @@ export default function SubmissionsPage() {
   const [testFilter, setTestFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     fetch("/api/tests")
@@ -138,8 +143,8 @@ export default function SubmissionsPage() {
             <tbody>
               {loading && <tr key="loading"><td colSpan={7} className="px-4 py-3 text-rfcm-charcoal/60">Loading...</td></tr>}
               {!loading && attempts.length === 0 && <tr key="empty"><td colSpan={7} className="px-4 py-3 text-rfcm-charcoal/50">No submissions found.</td></tr>}
-              {attempts.map((a) => (
-                <tr key={a.id} className="border-t border-rfcm-yellow-soft">
+              {attempts.map((a, idx) => (
+                <tr key={a.id} className={`border-t border-rfcm-yellow-soft ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${(idx % 6) + 1}`}>
                   <td className="px-4 py-2 font-medium">{a.student_name}</td>
                   <td className="px-4 py-2 text-rfcm-charcoal/70">{a.class_name || "—"}</td>
                   <td className="px-4 py-2">

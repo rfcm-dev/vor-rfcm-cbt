@@ -47,9 +47,16 @@ function LogoutButton() {
       disabled={loading}
       className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white/70 hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-      </svg>
+      {loading ? (
+        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+        </svg>
+      )}
       {loading ? "Signing out..." : "Sign out"}
     </button>
   );
@@ -60,8 +67,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<string>("");
   const [name, setName] = useState<string>("");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     fetch("/api/auth/me")
       .then((r) => r.ok ? r.json() : { role: "", name: "" })
       .then((data) => {
@@ -103,8 +112,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
         {/* Mobile drawer */}
         {open && (
           <div className="md:hidden fixed inset-0 z-50">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
-            <aside className="absolute left-0 top-0 bottom-0 w-64 bg-rfcm-charcoal text-white p-5">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-modal-backdrop" onClick={() => setOpen(false)} />
+            <aside className="absolute left-0 top-0 bottom-0 w-64 bg-rfcm-charcoal text-white p-5 animate-drawer">
               <div className="mb-8">
                 <p className="font-serif font-bold text-lg text-rfcm-yellow">RFCM CBT</p>
                 <p className="text-xs text-white/50 capitalize">{role || "User"}</p>
@@ -131,7 +140,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
         {/* Desktop sidebar + content */}
         <div className="md:flex min-h-screen">
-          <aside className="hidden md:flex md:flex-col md:w-64 bg-rfcm-charcoal text-white flex-shrink-0">
+          <aside className={`hidden md:flex md:flex-col md:w-64 bg-rfcm-charcoal text-white flex-shrink-0 transition-all duration-700 ${mounted ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"}`}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-8">
                 <div className="w-10 h-10 rounded-xl bg-rfcm-red flex items-center justify-center">
@@ -173,7 +182,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
               <LogoutButton />
             </div>
           </aside>
-          <main className="flex-1 p-4 md:p-8 overflow-y-auto">{children}</main>
+          <main className={`flex-1 p-4 md:p-8 overflow-y-auto transition-all duration-700 delay-150 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>{children}</main>
         </div>
       </div>
     </ToastProvider>
