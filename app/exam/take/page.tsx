@@ -26,6 +26,7 @@ function TakeExamInner() {
   const [initializing, setInitializing] = useState(true);
   const [initError, setInitError] = useState("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     async function init() {
@@ -112,39 +113,43 @@ function TakeExamInner() {
 
   const submit = useMemo(
     () => async (autoSubmitted: boolean) => {
-      if (!attemptId || submitted) return;
+      if (!attemptId || submitted || submittingRef.current) return;
+      submittingRef.current = true;
+      try {
+        const payload = {
+          attempt_id: attemptId,
+          auto_submitted: autoSubmitted,
+          answers: Object.entries(answers).map(([question_id, response]) => ({ question_id, response })),
+        };
 
-      const payload = {
-        attempt_id: attemptId,
-        auto_submitted: autoSubmitted,
-        answers: Object.entries(answers).map(([question_id, response]) => ({ question_id, response })),
-      };
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const res = await fetch("/api/exam/submit", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
 
-      const maxRetries = 3;
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          const res = await fetch("/api/exam/submit", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+            if (res.ok) {
+              setSubmitted(true);
+              return;
+            }
 
-          if (res.ok) {
-            setSubmitted(true);
-            return;
-          }
-
-          if (attempt < maxRetries) {
-            await new Promise((r) => setTimeout(r, 1000 * attempt));
-          }
-        } catch {
-          if (attempt < maxRetries) {
-            await new Promise((r) => setTimeout(r, 1000 * attempt));
+            if (attempt < maxRetries) {
+              await new Promise((r) => setTimeout(r, 1000 * attempt));
+            }
+          } catch {
+            if (attempt < maxRetries) {
+              await new Promise((r) => setTimeout(r, 1000 * attempt));
+            }
           }
         }
-      }
 
-      setSubmitError("Something went wrong submitting your exam. Your answers are saved on this device. Please tell your admin your exam did not submit, and try refreshing this page.");
+        setSubmitError("Something went wrong submitting your exam. Your answers are saved on this device. Please tell your admin your exam did not submit, and try refreshing this page.");
+      } finally {
+        submittingRef.current = false;
+      }
     },
     [attemptId, answers, submitted]
   );

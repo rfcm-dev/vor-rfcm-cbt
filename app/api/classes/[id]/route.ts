@@ -29,6 +29,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const { error: tcError } = await db.from("test_classes").delete().eq("class_id", params.id);
   if (tcError) return NextResponse.json({ error: tcError.message }, { status: 500 });
 
+  const { error: caError } = await db.from("class_assignments").delete().eq("class_id", params.id);
+  if (caError) return NextResponse.json({ error: caError.message }, { status: 500 });
+
+  const { error: studentError } = await db.from("students").delete().eq("class_id", params.id);
+  if (studentError) return NextResponse.json({ error: studentError.message }, { status: 500 });
+
   const { error } = await db.from("classes").delete().eq("id", params.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

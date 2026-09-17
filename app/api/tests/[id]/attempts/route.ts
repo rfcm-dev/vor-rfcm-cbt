@@ -12,6 +12,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       count: attempts.length,
       attempts: attempts.map((a) => ({
         id: a.attempt_id,
+        test_id: a.test_id,
+        student_id: a.student_id,
         student_name: a.student_name ?? "Unknown",
         started_at: a.started_at,
         submitted_at: a.submitted_at,

@@ -2,27 +2,32 @@
 
 import { useEffect, useState } from "react";
 import DashboardShell from "@/components/DashboardShell";
+import { useToast } from "@/components/ToastProvider";
 
 type TestSummary = { id: string; title: string };
 type ClassRow = { id: string; name: string };
 type AttemptRow = {
   id: string;
+  test_id: string;
+  student_id: string;
   student_name: string;
   class_name: string;
   test_title: string;
   started_at: string;
-  submitted_at: string;
+  submitted_at: string | null;
   status: string;
   late_seconds: number;
   result: { total_score: number | null; status: string } | null;
 };
 
 export default function SubmissionsPage() {
+  const { showToast } = useToast();
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [attempts, setAttempts] = useState<AttemptRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [retaking, setRetaking] = useState(false);
 
   const [testFilter, setTestFilter] = useState("");
   const [classFilter, setClassFilter] = useState("");
@@ -54,6 +59,32 @@ export default function SubmissionsPage() {
   }, [testFilter, classFilter, statusFilter]);
 
   const fmt = (iso: string | null) => iso ? new Date(iso).toLocaleString() : "—";
+
+  async function grantRetake(testId: string, studentId: string) {
+    setError("");
+    setRetaking(true);
+    try {
+      const res = await fetch("/api/retake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test_id: testId, student_id: studentId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || `Retake failed (${res.status})`;
+        setError(msg);
+        showToast(msg, "error");
+        return;
+      }
+      showToast("Retake approved. The student can now retake this exam.", "success");
+    } catch (e: any) {
+      const msg = e.message || "Network error";
+      setError(msg);
+      showToast(msg, "error");
+    } finally {
+      setRetaking(false);
+    }
+  }
 
   return (
     <DashboardShell>
@@ -105,14 +136,14 @@ export default function SubmissionsPage() {
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={7} className="px-4 py-3 text-rfcm-charcoal/60">Loading...</td></tr>}
-              {!loading && attempts.length === 0 && <tr><td colSpan={7} className="px-4 py-3 text-rfcm-charcoal/50">No submissions found.</td></tr>}
+              {loading && <tr key="loading"><td colSpan={7} className="px-4 py-3 text-rfcm-charcoal/60">Loading...</td></tr>}
+              {!loading && attempts.length === 0 && <tr key="empty"><td colSpan={7} className="px-4 py-3 text-rfcm-charcoal/50">No submissions found.</td></tr>}
               {attempts.map((a) => (
                 <tr key={a.id} className="border-t border-rfcm-yellow-soft">
                   <td className="px-4 py-2 font-medium">{a.student_name}</td>
                   <td className="px-4 py-2 text-rfcm-charcoal/70">{a.class_name || "—"}</td>
                   <td className="px-4 py-2">
-                    <a href={`/dashboard/results?test_id=${a.test_title}`} className="text-rfcm-red hover:underline">{a.test_title}</a>
+                    <a href={`/dashboard/results?test_id=${a.test_id}`} className="text-rfcm-red hover:underline">{a.test_title}</a>
                   </td>
                   <td className="px-4 py-2 text-rfcm-charcoal/70">{fmt(a.submitted_at)}</td>
                   <td className="px-4 py-2">
@@ -127,6 +158,14 @@ export default function SubmissionsPage() {
                       <a href={`/api/export/worksheet?attempt_id=${a.id}`} className="text-xs text-rfcm-red font-medium hover:underline">Worksheet</a>
                       {a.result?.status === "released" && (
                         <a href={`/api/export/result?attempt_id=${a.id}`} className="text-xs text-rfcm-red font-medium hover:underline">Result PDF</a>
+                      )}
+                      {(a.status === "submitted" || a.status === "auto_submitted") && (
+                        <button
+                          onClick={() => grantRetake(a.test_id, a.student_id)}
+                          disabled={retaking}
+                          className="text-xs text-rfcm-red font-medium hover:underline disabled:opacity-50">
+                          {retaking ? "Approving..." : "Grant retake"}
+                        </button>
                       )}
                     </div>
                   </td>

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import DashboardShell from "@/components/DashboardShell";
 import { useToast } from "@/components/ToastProvider";
 
 type TestSummary = { id: string; title: string; status: string; opens_at: string | null; closes_at: string | null; time_limit_minutes: number; submitted_count: number; pending_grading_count: number; ready_to_release_count: number };
-type AttemptRow = { id: string; student_name: string; started_at: string; submitted_at: string | null; status: string; late_seconds: number; result: { total_score: number | null; status: string } | null };
+type AttemptRow = { id: string; test_id: string; student_id: string; student_name: string; started_at: string; submitted_at: string | null; status: string; late_seconds: number; result: { total_score: number | null; status: string } | null };
 type AdminResult = { attempt_id: string; result_id: string; student_id: string; student_name: string; class_id: string; class_name: string; test_id: string; test_title: string; total_score: number | null; total_possible: number; percentage: number; grade: string; status: string; released_at: string | null; submitted_at: string | null };
 type ClassRow = { id: string; name: string };
 
@@ -13,6 +14,7 @@ type Tab = "by_exam" | "leaderboard";
 
 export default function ResultsPage() {
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
   const [tests, setTests] = useState<TestSummary[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [tab, setTab] = useState<Tab>("by_exam");
@@ -22,12 +24,18 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [releasing, setReleasing] = useState(false);
+  const [retaking, setRetaking] = useState(false);
 
   const [leaderboardResults, setLeaderboardResults] = useState<AdminResult[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [leaderboardClassFilter, setLeaderboardClassFilter] = useState("");
   const [leaderboardTestFilter, setLeaderboardTestFilter] = useState("");
   const [leaderboardSort, setLeaderboardSort] = useState<"score_desc" | "score_asc" | "name_asc">("score_desc");
+
+  useEffect(() => {
+    const testId = searchParams.get("test_id");
+    if (testId) setSelectedTestId(testId);
+  }, [searchParams]);
 
   useEffect(() => {
     fetch("/api/tests")
@@ -49,9 +57,9 @@ export default function ResultsPage() {
     setLoading(true);
     setError("");
     setSelected([]);
-    fetch(`/api/tests/${selectedTestId}/attempts`)
-      .then((r) => r.ok ? r.json() : { attempts: [] })
-      .then((data) => setAttempts(data.attempts ?? []))
+    fetch(`/api/attempts/all?test_id=${selectedTestId}`)
+      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`Failed to load attempts (${r.status})`)))
+      .then((data) => setAttempts(Array.isArray(data) ? data : data.attempts ?? []))
       .catch((e) => { setError(e.message); setAttempts([]); })
       .finally(() => setLoading(false));
   }, [tab, selectedTestId]);
@@ -124,6 +132,32 @@ export default function ResultsPage() {
     }
   }
 
+  async function grantRetake(testId: string, studentId: string) {
+    setError("");
+    setRetaking(true);
+    try {
+      const res = await fetch("/api/retake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test_id: testId, student_id: studentId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data.error || `Retake failed (${res.status})`;
+        setError(msg);
+        showToast(msg, "error");
+        return;
+      }
+      showToast("Retake approved. The student can now retake this exam.", "success");
+    } catch (e: any) {
+      const msg = e.message || "Network error";
+      setError(msg);
+      showToast(msg, "error");
+    } finally {
+      setRetaking(false);
+    }
+  }
+
   const selectedTest = tests.find((t) => t.id === selectedTestId);
   const gradable = attempts.filter((a) => a.result?.status === "graded");
 
@@ -187,6 +221,14 @@ export default function ResultsPage() {
                     <input type="checkbox" onChange={(e) => setSelected((s) => (e.target.checked ? [...s, a.id] : s.filter((id) => id !== a.id)))} />
                     <span className="text-xs text-rfcm-charcoal/60">Release</span>
                   </label>
+                )}
+                {(a.status === "submitted" || a.status === "auto_submitted") && (
+                  <button
+                    onClick={() => grantRetake(a.test_id, a.student_id)}
+                    disabled={retaking}
+                    className="text-xs text-rfcm-red font-medium hover:underline px-3 py-1.5 rounded-md hover:bg-rfcm-red/5 transition-colors disabled:opacity-50">
+                    {retaking ? "Approving..." : "Grant retake"}
+                  </button>
                 )}
               </div>
             ))}
@@ -266,7 +308,7 @@ export default function ResultsPage() {
                 </thead>
                 <tbody>
                   {!leaderboardLoading && sortedLeaderboard.length === 0 && (
-                    <tr><td colSpan={9} className="px-4 py-3 text-rfcm-charcoal/50">No released results found.</td></tr>
+                    <tr key="empty"><td colSpan={9} className="px-4 py-3 text-rfcm-charcoal/50">No released results found.</td></tr>
                   )}
                   {sortedLeaderboard.map((r, idx) => (
                     <tr key={r.attempt_id} className="border-t border-rfcm-yellow-soft">
@@ -289,7 +331,15 @@ export default function ResultsPage() {
                         <span className="text-xs font-medium capitalize">{r.status}</span>
                       </td>
                       <td className="px-4 py-2">
-                        <a href={`/api/export/result?attempt_id=${r.attempt_id}`} className="text-xs text-rfcm-red font-medium hover:underline">Result PDF</a>
+                        <div className="flex items-center gap-3">
+                          <a href={`/api/export/result?attempt_id=${r.attempt_id}`} className="text-xs text-rfcm-red font-medium hover:underline">Result PDF</a>
+                          <button
+                            onClick={() => grantRetake(r.test_id, r.student_id)}
+                            disabled={retaking}
+                            className="text-xs text-rfcm-red font-medium hover:underline disabled:opacity-50">
+                            {retaking ? "Approving..." : "Grant retake"}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

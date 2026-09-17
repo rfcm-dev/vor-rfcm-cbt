@@ -19,5 +19,24 @@ export async function GET(req: NextRequest) {
     resultStatus: resultStatus ?? undefined,
   });
 
-  return NextResponse.json(attempts);
+  const mapped = attempts.map((a: any) => ({
+    id: a.attempt_id,
+    test_id: a.test_id,
+    student_id: a.student_id,
+    student_name: a.student_name ?? "Unknown",
+    class_name: a.class_name ?? "",
+    test_title: a.test_title ?? "Unknown",
+    started_at: a.started_at,
+    submitted_at: a.submitted_at ?? null,
+    status: a.attempt_status,
+    late_seconds: a.late_seconds ?? 0,
+    result: a.result_id
+      ? {
+          total_score: a.total_score,
+          status: a.result_status,
+        }
+      : null,
+  }));
+
+  return NextResponse.json(mapped);
 }
