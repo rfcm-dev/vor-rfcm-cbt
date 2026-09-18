@@ -8,6 +8,7 @@ import { useToast } from "@/components/ToastProvider";
 
 type ExamSummary = {
   id: string;
+  test_id: string;
   title: string;
   status: string;
   started_at: string | null;
@@ -102,6 +103,7 @@ export default function StudentDashboardPage() {
   }
 
   const activeExam = exams.find((e) => e.status === "in_progress");
+  const availableExams = exams.filter((e) => e.status === "not_started");
   const completedExams = exams.filter((e) => e.status === "submitted" || e.status === "auto_submitted");
 
   return (
@@ -138,12 +140,12 @@ export default function StudentDashboardPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md transition-all">
-            <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Active Exams</p>
-            <p className="text-3xl font-bold text-rfcm-charcoal">{exams.filter((e) => e.status === "in_progress").length}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Available Exams</p>
+            <p className="text-3xl font-bold text-rfcm-charcoal">{availableExams.length}</p>
           </div>
           <div className="bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md transition-all">
-            <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Completed</p>
-            <p className="text-3xl font-bold text-rfcm-charcoal">{completedExams.length}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">In Progress</p>
+            <p className="text-3xl font-bold text-rfcm-charcoal">{activeExam ? 1 : 0}</p>
           </div>
           <div className="bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md transition-all">
             <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Released Results</p>
@@ -151,7 +153,7 @@ export default function StudentDashboardPage() {
           </div>
         </div>
 
-        {/* Active Exam */}
+        {/* Active Exam Banner */}
         {activeExam && (
           <div className="mb-8">
             <h2 className="font-serif text-lg font-bold text-rfcm-charcoal mb-3">Continue Exam</h2>
@@ -169,24 +171,24 @@ export default function StudentDashboardPage() {
           </div>
         )}
 
-        {/* Available Exams */}
+        {/* Available Examinations */}
         <div className="mb-8">
           <h2 className="font-serif text-lg font-bold text-rfcm-charcoal mb-3">Available Examinations</h2>
-          {exams.filter((e) => e.status === "in_progress").length === 0 ? (
+          {availableExams.length === 0 ? (
             <div className="bg-white rounded-2xl border border-rfcm-yellow-soft p-8 text-center">
-              <p className="text-sm text-rfcm-charcoal/50">No active exams right now.</p>
+              <p className="text-sm text-rfcm-charcoal/50">No available exams right now.</p>
             </div>
           ) : (
             <div className="grid gap-3">
-              {exams.map((exam, idx) => (
-                <div key={exam.id} className={`bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md hover:border-rfcm-red/30 transition-all ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${idx + 1}`}>
+              {availableExams.map((exam, idx) => (
+                <div key={`${exam.test_id}-${exam.status}`} className={`bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md hover:border-rfcm-red/30 transition-all ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${idx + 1}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
                       <p className="font-medium text-rfcm-charcoal">{exam.title}</p>
-                      <p className="text-xs text-rfcm-charcoal/50 mt-1">Status: {exam.status}</p>
+                      <p className="text-xs text-rfcm-charcoal/50 mt-1">Status: {exam.status.replace(/_/g, " ")}</p>
                     </div>
                     {exam.status === "not_started" && (
-                      <button onClick={() => router.push(`/exam/instructions?test_id=${exam.id}`)} className="inline-flex items-center gap-2 rounded-xl bg-rfcm-red text-white text-sm font-medium px-4 py-2 hover:bg-rfcm-red-dark transition-colors">
+                      <button onClick={() => router.push(`/exam/instructions?test_id=${exam.test_id}`)} className="inline-flex items-center gap-2 rounded-xl bg-rfcm-red text-white text-sm font-medium px-4 py-2 hover:bg-rfcm-red-dark transition-colors">
                         Start Exam
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
