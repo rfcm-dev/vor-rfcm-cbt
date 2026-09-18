@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import StudentLayout from "@/components/StudentLayout";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -35,6 +35,11 @@ export default function StudentDashboardPage() {
   const [results, setResults] = useState<ResultSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const showToastRef = useRef(showToast);
+
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
 
   useEffect(() => {
     setMounted(true);
@@ -65,14 +70,14 @@ export default function StudentDashboardPage() {
           setResults(data.results ?? []);
         }
       } catch {
-        showToast("Failed to load dashboard", "error");
+        showToastRef.current("Failed to load dashboard", "error");
       } finally {
         setLoading(false);
       }
     }
 
     load();
-  }, [router, showToast]);
+  }, [router]);
 
   const activeExam = useMemo(() => exams.find((e) => e.status === "in_progress"), [exams]);
   const availableExams = useMemo(() => exams.filter((e) => e.status === "not_started"), [exams]);

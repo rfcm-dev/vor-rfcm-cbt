@@ -9,7 +9,7 @@ type Role = "student" | "staff" | "admin";
 const ROLES: { key: Role; label: string; subtitle: string; href: string; color: string; icon: string }[] = [
   {
     key: "student",
-    label: "I'm a Student",
+    label: "I'm a V.O.R Student",
     subtitle: "Register once, then take your examination",
     href: "#",
     color: "from-blue-500 to-blue-600",
@@ -17,7 +17,7 @@ const ROLES: { key: Role; label: string; subtitle: string; href: string; color: 
   },
   {
     key: "staff",
-    label: "I'm a Staff",
+    label: "I'm a V.O.R Staff",
     subtitle: "Executive or Teacher portal",
     href: "/login",
     color: "from-emerald-500 to-emerald-600",
