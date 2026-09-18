@@ -65,19 +65,30 @@ export default function RegisterPage() {
         <p className="text-xs text-rfcm-charcoal/60 text-center mb-6">Register once per class. Your photo is optional.</p>
 
         {success ? (
-          <div className="text-center space-y-4 py-6">
-            <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-center space-y-5 py-8">
+            <div className="w-20 h-20 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+              <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
             <div>
-              <p className="font-semibold text-lg text-rfcm-charcoal">Registration successful!</p>
-              <p className="text-sm text-rfcm-charcoal/60 mt-1">You can now take your examination.</p>
+              <p className="font-semibold text-xl text-rfcm-charcoal">Registration successful!</p>
+              <p className="text-sm text-rfcm-charcoal/60 mt-1">Save your password. You can now take your examination or login to your portal.</p>
             </div>
-            <a href="/student" className="inline-block rounded-xl bg-rfcm-red text-white text-sm font-semibold px-6 py-3 hover:bg-rfcm-red-dark transition-colors">
-              Take Exam
-            </a>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <a href="/student" className="inline-flex items-center justify-center gap-2 rounded-xl bg-rfcm-red text-white text-sm font-semibold px-5 py-3 hover:bg-rfcm-red-dark transition-colors">
+                Take Exam
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </a>
+              <a href="/student/login" className="inline-flex items-center justify-center gap-2 rounded-xl border border-rfcm-yellow-soft text-rfcm-charcoal text-sm font-semibold px-5 py-3 hover:bg-rfcm-cream-dark transition-colors">
+                Login to Portal
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </a>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
