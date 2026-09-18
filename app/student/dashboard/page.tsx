@@ -74,6 +74,10 @@ export default function StudentDashboardPage() {
     load();
   }, [router, showToast]);
 
+  const activeExam = useMemo(() => exams.find((e) => e.status === "in_progress"), [exams]);
+  const availableExams = useMemo(() => exams.filter((e) => e.status === "not_started"), [exams]);
+  const completedExams = useMemo(() => exams.filter((e) => e.status === "submitted" || e.status === "auto_submitted"), [exams]);
+
   async function handleLogout() {
     await fetch("/api/auth/student-logout", { method: "POST" });
     showToast("Signed out", "success");
@@ -101,10 +105,6 @@ export default function StudentDashboardPage() {
   if (!student) {
     return null;
   }
-
-  const activeExam = useMemo(() => exams.find((e) => e.status === "in_progress"), [exams]);
-  const availableExams = useMemo(() => exams.filter((e) => e.status === "not_started"), [exams]);
-  const completedExams = useMemo(() => exams.filter((e) => e.status === "submitted" || e.status === "auto_submitted"), [exams]);
 
   return (
     <StudentLayout>
