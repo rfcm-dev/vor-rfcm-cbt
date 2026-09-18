@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import StudentLayout from "@/components/StudentLayout";
 import PrimaryButton from "@/components/PrimaryButton";
 import { useToast } from "@/components/ToastProvider";
-import { getStudentSession } from "@/lib/student-session";
 
 type ExamSummary = {
   id: string;
@@ -42,14 +41,15 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const session = await getStudentSession();
-      if (!session) {
-        router.push("/student/login");
-        return;
-      }
-      setStudent({ id: session.id, name: session.name });
-
       try {
+        const meRes = await fetch("/api/auth/me/student");
+        if (!meRes.ok) {
+          router.push("/student/login");
+          return;
+        }
+        const meData = await meRes.json();
+        setStudent({ id: meData.student.id, name: meData.student.name });
+
         const [examsRes, resultsRes] = await Promise.all([
           fetch("/api/student/exams"),
           fetch("/api/student/results"),
