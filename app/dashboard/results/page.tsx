@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import DashboardShell from "@/components/DashboardShell";
 import { useToast } from "@/components/ToastProvider";
@@ -13,6 +13,14 @@ type ClassRow = { id: string; name: string };
 type Tab = "by_exam" | "leaderboard";
 
 export default function ResultsPage() {
+  return (
+    <Suspense fallback={<div className="max-w-2xl mx-auto text-center py-20"><p className="text-sm text-rfcm-charcoal/60">Loading results...</p></div>}>
+      <ResultsContent />
+    </Suspense>
+  );
+}
+
+function ResultsContent() {
   const { showToast } = useToast();
   const searchParams = useSearchParams();
   const [tests, setTests] = useState<TestSummary[]>([]);
