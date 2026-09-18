@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [classCode, setClassCode] = useState("");
   const [name, setName] = useState("");
   const [teacherName, setTeacherName] = useState("");
+  const [password, setPassword] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -35,6 +36,7 @@ export default function RegisterPage() {
     formData.append("class_id", classId);
     formData.append("class_code", classCode);
     formData.append("teacher_name", teacherName);
+    formData.append("password", password);
     if (photo) formData.append("photo", photo);
 
     const res = await fetch("/api/students/register", { method: "POST", body: formData });
@@ -98,6 +100,13 @@ export default function RegisterPage() {
               <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Full Name</label>
               <input value={name} onChange={(e) => setName(e.target.value)} required
                 className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red transition-colors" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60 mb-1">Password</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
+                className="w-full rounded-lg border border-rfcm-yellow-soft bg-rfcm-cream-dark px-3 py-2 outline-none focus:border-rfcm-red transition-colors" />
+              <p className="text-[10px] text-rfcm-charcoal/50 mt-1">Use this to log in later as a student.</p>
             </div>
 
             <div>

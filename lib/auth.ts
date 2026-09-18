@@ -2,12 +2,19 @@ import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 
 const SESSION_COOKIE = "rfcm_session";
+const STUDENT_SESSION_COOKIE = "rfcm_student_session";
 const secret = new TextEncoder().encode(process.env.SESSION_SECRET!);
 
 export type SessionUser = {
   id: string;
   name: string;
   role: "superadmin" | "admin" | "executive" | "teacher";
+};
+
+export type StudentSessionUser = {
+  id: string;
+  name: string;
+  role: "student";
 };
 
 export async function hashPassword(password: string) {
@@ -26,13 +33,22 @@ export async function createSessionToken(user: SessionUser) {
     .sign(secret);
 }
 
-export async function verifySessionToken(token: string): Promise<SessionUser | null> {
+export async function createStudentSessionToken(user: StudentSessionUser) {
+  return new SignJWT(user)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("12h")
+    .sign(secret);
+}
+
+export async function verifySessionToken(token: string): Promise<SessionUser | StudentSessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as SessionUser;
+    return payload as unknown as SessionUser | StudentSessionUser;
   } catch {
     return null;
   }
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;
+export const STUDENT_SESSION_COOKIE_NAME = STUDENT_SESSION_COOKIE;

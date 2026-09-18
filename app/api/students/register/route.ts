@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { hashPassword } from "@/lib/auth";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
     const classId = String(formData.get("class_id") || "").trim();
     const classCode = String(formData.get("class_code") || "").trim();
     const teacherName = String(formData.get("teacher_name") || "").trim();
+    const password = String(formData.get("password") || "").trim();
     const file = formData.get("photo") as File | null;
 
     if (!name || !classId) {
@@ -63,13 +65,18 @@ export async function POST(req: NextRequest) {
       photoUrl = publicData.publicUrl;
     }
 
+    const passwordHash = password ? await hashPassword(password) : null;
+
     if (existing) {
+      const updateData: any = {
+        teacher_name: teacherName || null,
+        photo_url: photoUrl ?? undefined,
+      };
+      if (passwordHash) updateData.password_hash = passwordHash;
+
       const { error: updateError } = await db
         .from("students")
-        .update({
-          teacher_name: teacherName || null,
-          photo_url: photoUrl ?? undefined,
-        })
+        .update(updateData)
         .eq("id", existing.id);
 
       if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
@@ -83,6 +90,7 @@ export async function POST(req: NextRequest) {
         name,
         teacher_name: teacherName || null,
         photo_url: photoUrl,
+        password_hash: passwordHash,
       })
       .select("id")
       .single();
