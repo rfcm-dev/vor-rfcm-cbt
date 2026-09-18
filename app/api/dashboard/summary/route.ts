@@ -10,27 +10,32 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
 
-  const { data: activeTests } = await db.from("tests").select("id, opens_at, closes_at").eq("status", "active");
+  const [
+    { data: activeTests },
+    { data: essayQuestions },
+    { count: pendingRelease },
+    { count: totalClasses },
+    { count: totalExams },
+  ] = await Promise.all([
+    db.from("tests").select("id, opens_at, closes_at").eq("status", "active"),
+    db.from("questions").select("id").eq("type", "essay"),
+    db.from("results").select("*", { count: "exact", head: true }).eq("status", "graded"),
+    db.from("classes").select("*", { count: "exact", head: true }),
+    db.from("tests").select("*", { count: "exact", head: true }),
+  ]);
+
+  const essayQuestionIds = (essayQuestions ?? []).map((q: any) => q.id);
+  const { count: pendingGrading } = await db
+    .from("answers")
+    .select("*", { count: "exact", head: true })
+    .is("manual_score", null)
+    .in("question_id", essayQuestionIds);
 
   const openCount = (activeTests ?? []).filter((t: any) => {
     if (t.opens_at && new Date(t.opens_at) > now) return false;
     if (t.closes_at && new Date(t.closes_at) < now) return false;
     return true;
   }).length;
-
-  const { count: pendingGrading } = await db
-    .from("answers")
-    .select("*", { count: "exact", head: true })
-    .is("manual_score", null)
-    .eq("questions.type", "essay");
-
-  const { count: pendingRelease } = await db
-    .from("results")
-    .select("*", { count: "exact", head: true })
-    .eq("status", "graded");
-
-  const { count: totalClasses } = await db.from("classes").select("*", { count: "exact", head: true });
-  const { count: totalExams } = await db.from("tests").select("*", { count: "exact", head: true });
 
   return NextResponse.json({
     open_exams_count: openCount,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import DashboardShell from "@/components/DashboardShell";
 import { useToast } from "@/components/ToastProvider";
@@ -91,11 +91,14 @@ function ResultsContent() {
       .finally(() => setLeaderboardLoading(false));
   }, [tab, leaderboardClassFilter, leaderboardTestFilter]);
 
-  const sortedLeaderboard = [...leaderboardResults].sort((a, b) => {
-    if (leaderboardSort === "score_desc") return (b.percentage ?? 0) - (a.percentage ?? 0);
-    if (leaderboardSort === "score_asc") return (a.percentage ?? 0) - (b.percentage ?? 0);
-    return a.student_name.localeCompare(b.student_name);
-  });
+  const sortedLeaderboard = useMemo(() => {
+    const sorted = [...leaderboardResults];
+    if (leaderboardSort === "score_desc") return sorted.sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0));
+    if (leaderboardSort === "score_asc") return sorted.sort((a, b) => (a.percentage ?? 0) - (b.percentage ?? 0));
+    return sorted.sort((a, b) => a.student_name.localeCompare(b.student_name));
+  }, [leaderboardResults, leaderboardSort]);
+
+  const gradable = useMemo(() => attempts.filter((a) => a.result?.status === "graded"), [attempts]);
 
   async function release() {
     setError("");
@@ -172,7 +175,6 @@ function ResultsContent() {
   }
 
   const selectedTest = tests.find((t) => t.id === selectedTestId);
-  const gradable = attempts.filter((a) => a.result?.status === "graded");
 
   return (
     <DashboardShell>

@@ -13,48 +13,57 @@ function generateExamCode(title: string) {
 
 export async function GET(req: NextRequest) {
   const classId = req.nextUrl.searchParams.get("class_id");
-  let query = db.from("tests").select("*").order("created_at", { ascending: false });
-  if (classId) query = query.eq("class_id", classId);
+  const page = Math.max(1, parseInt(req.nextUrl.searchParams.get("page") || "1", 10));
+  const limit = Math.min(50, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") || "20", 10)));
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
 
-  const { data, error } = await query;
+  let testsQuery = db.from("tests").select("*", { count: "exact" }).order("created_at", { ascending: false }).range(from, to);
+  if (classId) testsQuery = testsQuery.eq("class_id", classId);
+
+  const { data: tests, count, error } = await testsQuery;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { data: tcRows } = await db.from("test_classes").select("test_id");
+  const testIds = (tests ?? []).map((t: any) => t.id);
+  if (testIds.length === 0) {
+    return NextResponse.json({ data: [], count: 0, page, limit });
+  }
+
+  const [
+    { data: tcRows },
+    { data: attempts },
+    { data: results },
+  ] = await Promise.all([
+    db.from("test_classes").select("test_id").in("test_id", testIds),
+    db.from("attempts").select("id, test_id, status").in("test_id", testIds),
+    db.from("results").select("attempt_id, status").in("attempt_id", (await db.from("attempts").select("id").in("test_id", testIds)).data?.map((a: any) => a.id) ?? []),
+  ]);
+
   const countMap: Record<string, number> = {};
   (tcRows ?? []).forEach((r: any) => { countMap[r.test_id] = (countMap[r.test_id] || 0) + 1; });
 
-  const { data: attempts } = await db
-    .from("attempts")
-    .select("id, test_id, status")
-    .in("test_id", (data ?? []).map((t: any) => t.id));
-
-  const { data: results } = await db
-    .from("results")
-    .select("attempt_id, status")
-    .in("attempt_id", (attempts ?? []).map((a: any) => a.id));
-
   const resultStatusMap = Object.fromEntries((results ?? []).map((r: any) => [r.attempt_id, r.status]));
-
-  const enriched = (data ?? []).map((t: any) => {
-    const testAttempts = (attempts ?? []).filter((a: any) => a.test_id === t.id);
-    const submitted = testAttempts.filter((a: any) => a.status === "submitted" || a.status === "auto_submitted").length;
-    const pendingGrading = testAttempts.filter((a: any) => {
-      const rStatus = resultStatusMap[a.id];
-      return rStatus === "pending_grading";
-    }).length;
-    const readyToRelease = testAttempts.filter((a: any) => {
-      const rStatus = resultStatusMap[a.id];
-      return rStatus === "graded";
-    }).length;
-    return {
-      ...t,
-      class_count: countMap[t.id] || 0,
-      submitted_count: submitted,
-      pending_grading_count: pendingGrading,
-      ready_to_release_count: readyToRelease,
-    };
+  const submittedByTest: Record<string, number> = {};
+  const pendingByTest: Record<string, number> = {};
+  const readyByTest: Record<string, number> = {};
+  (attempts ?? []).forEach((a: any) => {
+    const rStatus = resultStatusMap[a.id];
+    if (a.status === "submitted" || a.status === "auto_submitted") {
+      submittedByTest[a.test_id] = (submittedByTest[a.test_id] || 0) + 1;
+    }
+    if (rStatus === "pending_grading") pendingByTest[a.test_id] = (pendingByTest[a.test_id] || 0) + 1;
+    if (rStatus === "graded") readyByTest[a.test_id] = (readyByTest[a.test_id] || 0) + 1;
   });
-  return NextResponse.json(enriched);
+
+  const enriched = (tests ?? []).map((t: any) => ({
+    ...t,
+    class_count: countMap[t.id] || 0,
+    submitted_count: submittedByTest[t.id] || 0,
+    pending_grading_count: pendingByTest[t.id] || 0,
+    ready_to_release_count: readyByTest[t.id] || 0,
+  }));
+
+  return NextResponse.json({ data: enriched, count: count ?? 0, page, limit });
 }
 
 export async function POST(req: NextRequest) {

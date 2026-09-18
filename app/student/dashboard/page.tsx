@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import StudentLayout from "@/components/StudentLayout";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -102,9 +102,9 @@ export default function StudentDashboardPage() {
     return null;
   }
 
-  const activeExam = exams.find((e) => e.status === "in_progress");
-  const availableExams = exams.filter((e) => e.status === "not_started");
-  const completedExams = exams.filter((e) => e.status === "submitted" || e.status === "auto_submitted");
+  const activeExam = useMemo(() => exams.find((e) => e.status === "in_progress"), [exams]);
+  const availableExams = useMemo(() => exams.filter((e) => e.status === "not_started"), [exams]);
+  const completedExams = useMemo(() => exams.filter((e) => e.status === "submitted" || e.status === "auto_submitted"), [exams]);
 
   return (
     <StudentLayout>

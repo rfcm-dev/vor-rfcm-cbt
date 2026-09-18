@@ -11,6 +11,7 @@ export interface AttemptOverviewFilters {
   stuckOnly?: boolean;
   includeInProgress?: boolean;
   resultStatus?: string;
+  limit?: number;
 }
 
 export async function getAttemptOverview(filters: AttemptOverviewFilters = {}) {
@@ -18,6 +19,10 @@ export async function getAttemptOverview(filters: AttemptOverviewFilters = {}) {
     .from("attempt_overview")
     .select("*")
     .order("started_at", { ascending: false });
+
+  if (filters.limit) {
+    query = query.limit(filters.limit);
+  }
 
   if (filters.testId) {
     query = query.eq("test_id", filters.testId);
