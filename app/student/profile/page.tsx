@@ -42,17 +42,14 @@ export default function StudentProfilePage() {
           router.push("/student/login");
           return;
         }
-        const meData = await meRes.json();
-        const studentId = meData.student.id;
 
-        const profileRes = await fetch(`/api/students/lookup?class_id=${meData.student.id}`);
+        const profileRes = await fetch("/api/student/profile");
         if (profileRes.ok) {
-          const students = await profileRes.json();
-          const student = students.find((s: any) => s.id === studentId);
-          if (student) {
-            setProfile(student);
-            setTeacherName(student.teacher_name || "");
-          }
+          const student = await profileRes.json();
+          setProfile(student);
+          setTeacherName(student.teacher_name || "");
+        } else {
+          setError("Profile not found");
         }
       } catch {
         showToast("Failed to load profile", "error");
@@ -71,10 +68,10 @@ export default function StudentProfilePage() {
     setSuccess("");
 
     try {
-      const res = await fetch("/api/students/lookup", {
+      const res = await fetch("/api/student/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ student_id: profile.id, teacher_name: teacherName }),
+        body: JSON.stringify({ teacher_name: teacherName }),
       });
 
       if (!res.ok) {
@@ -83,6 +80,8 @@ export default function StudentProfilePage() {
         return;
       }
 
+      const updated = await res.json();
+      setProfile(updated);
       setSuccess("Profile updated successfully");
       showToast("Profile updated", "success");
     } catch {
