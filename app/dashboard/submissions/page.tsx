@@ -40,12 +40,12 @@ export default function SubmissionsPage() {
 
   useEffect(() => {
     fetch("/api/tests")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setTests)
+      .then((r) => r.ok ? r.json() : { data: [] })
+      .then((d) => setTests(d.data ?? []))
       .catch(() => setTests([]));
     fetch("/api/classes")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setClasses)
+      .then((r) => r.ok ? r.json() : { data: [] })
+      .then((d) => setClasses(d.data ?? []))
       .catch(() => setClasses([]));
   }, []);
 
@@ -57,8 +57,8 @@ export default function SubmissionsPage() {
     if (classFilter) params.set("class_id", classFilter);
     if (statusFilter) params.set("status", statusFilter);
     fetch(`/api/attempts/all?${params}`)
-      .then((r) => r.ok ? r.json() : [])
-      .then(setAttempts)
+      .then((r) => r.ok ? r.json() : { attempts: [] })
+      .then((d) => setAttempts(d.attempts ?? []))
       .catch((e) => { setError(e.message); setAttempts([]); })
       .finally(() => setLoading(false));
   }, [testFilter, classFilter, statusFilter]);

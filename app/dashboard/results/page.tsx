@@ -52,12 +52,12 @@ function ResultsContent() {
 
   useEffect(() => {
     fetch("/api/tests")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setTests)
+      .then((r) => r.ok ? r.json() : { data: [] })
+      .then((d) => setTests(d.data ?? []))
       .catch(() => setTests([]));
     fetch("/api/classes")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setClasses)
+      .then((r) => r.ok ? r.json() : { data: [] })
+      .then((d) => setClasses(d.data ?? []))
       .catch(() => setClasses([]));
   }, []);
 

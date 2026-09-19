@@ -29,6 +29,11 @@ function TakeExamInner() {
   const submittingRef = useRef(false);
 
   useEffect(() => {
+    if (!testId || !studentId) {
+      setInitError("Missing required information");
+      setInitializing(false);
+      return;
+    }
     async function init() {
       setInitializing(true);
       setInitError("");
@@ -62,7 +67,7 @@ function TakeExamInner() {
         setInitializing(false);
       }
     }
-    if (testId && studentId) init();
+    init();
   }, [testId, studentId]);
 
   useEffect(() => {

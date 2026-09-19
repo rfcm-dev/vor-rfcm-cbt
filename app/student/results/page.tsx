@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import StudentLayout from "@/components/StudentLayout";
 import PrimaryButton from "@/components/PrimaryButton";
@@ -31,6 +31,12 @@ export default function StudentResultsPage() {
     setMounted(true);
   }, []);
 
+  const showToastRef = useRef(showToast);
+
+  useEffect(() => {
+    showToastRef.current = showToast;
+  }, [showToast]);
+
   useEffect(() => {
     async function load() {
       try {
@@ -46,13 +52,13 @@ export default function StudentResultsPage() {
           setAttempts(data.attempts ?? []);
         }
       } catch {
-        showToast("Failed to load exam history", "error");
+        showToastRef.current("Failed to load exam history", "error");
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [router, showToast]);
+  }, [router]);
 
   if (loading) {
     return (

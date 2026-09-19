@@ -11,30 +11,56 @@ function InstructionsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const testId = searchParams.get("test_id") ?? "";
-  const studentId = searchParams.get("student_id") ?? "";
 
+  const [studentId, setStudentId] = useState("");
   const [test, setTest] = useState<{ title: string; time_limit_minutes: number } | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
-    if (!testId) return;
+    async function init() {
+      try {
+        const meRes = await fetch("/api/auth/me/student");
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          setStudentId(meData.student.id);
+        }
+      } catch {
+        setError("Unable to get student information");
+      }
+    }
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (!testId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setError("");
     fetch(`/api/tests/${testId}`)
       .then((r) => {
-        if (!r.ok) throw new Error("not found");
+        if (!r.ok) throw new Error("Test not found");
         return r.json();
       })
       .then((body) => {
         setTest({ title: body.title, time_limit_minutes: body.time_limit_minutes });
         setQuestionCount(body.question_count);
       })
-      .catch(() => {})
+      .catch((e) => {
+        setError(e.message);
+      })
       .finally(() => setLoading(false));
   }, [testId]);
 
   function startExam() {
+    if (!studentId) {
+      setError("Student information not loaded");
+      return;
+    }
     setStarting(true);
     router.push(`/exam/take?test_id=${testId}&student_id=${studentId}`);
   }
@@ -46,6 +72,21 @@ function InstructionsInner() {
           <div className="text-center space-y-4">
             <div className="w-16 h-16 mx-auto border-4 border-rfcm-red border-t-transparent rounded-full animate-spin"></div>
             <p className="text-sm text-rfcm-charcoal/60">Loading examination details...</p>
+          </div>
+        </ExamCard>
+      </StudentLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <StudentLayout>
+        <ExamCard className="max-w-md">
+          <div className="text-center space-y-4">
+            <p className="text-sm text-rfcm-red">Failed to load examination: {error}</p>
+            <button onClick={() => router.back()} className="text-sm text-rfcm-red hover:underline">
+              Go back
+            </button>
           </div>
         </ExamCard>
       </StudentLayout>

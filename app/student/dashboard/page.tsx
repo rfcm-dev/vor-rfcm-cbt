@@ -168,7 +168,7 @@ export default function StudentDashboardPage() {
                   <p className="font-medium text-rfcm-charcoal text-lg">{activeExam.title}</p>
                   <p className="text-xs text-rfcm-charcoal/50 mt-1">You have an exam in progress</p>
                 </div>
-                <PrimaryButton onClick={() => router.push(`/exam/take?attempt_id=${activeExam.id}`)}>
+                <PrimaryButton onClick={() => router.push(`/exam/instructions?test_id=${activeExam.test_id}`)}>
                   Resume Exam
                 </PrimaryButton>
               </div>
