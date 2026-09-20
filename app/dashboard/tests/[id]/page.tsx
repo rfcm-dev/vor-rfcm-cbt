@@ -7,8 +7,8 @@ import { useParams, useRouter } from "next/navigation";
 import DashboardShell from "@/components/DashboardShell";
 import { useToast } from "@/components/ToastProvider";
 
-type Question = { id: string; type: string; content: string; options: any; correct_answer: string | null; points: number; created_by: string | null; users: { name: string } | null };
-type TestRow = { id: string; title: string; status: string; exam_code: string; opens_at: string | null; closes_at: string | null; time_limit_minutes: number };
+type Question = { id: string; type: string; content: string; options: any; correct_answer: string | null; acceptable_answers: string[] | null; rubric: any[] | null; points: number; created_by: string | null; users: { name: string } | null };
+type TestRow = { id: string; title: string; status: string; exam_code: string; opens_at: string | null; closes_at: string | null; time_limit_minutes: number; randomize_questions: boolean; randomize_options: boolean; sections: any[] | null };
 type ClassRow = { id: string; name: string };
 
 const TYPES = [
@@ -35,6 +35,8 @@ export default function TestDetailPage() {
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correct, setCorrect] = useState("");
   const [points, setPoints] = useState(1);
+  const [acceptableAnswers, setAcceptableAnswers] = useState<string[]>([""]);
+  const [rubricCriteria, setRubricCriteria] = useState<{ id: string; label: string; max_points: number }[]>([{ id: crypto.randomUUID(), label: "", max_points: 0 }]);
 
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
@@ -47,6 +49,8 @@ export default function TestDetailPage() {
   const [qEditContent, setQEditContent] = useState("");
   const [qEditPoints, setQEditPoints] = useState(1);
   const [qEditCorrect, setQEditCorrect] = useState("");
+  const [qEditAcceptableAnswers, setQEditAcceptableAnswers] = useState<string[]>([""]);
+  const [qEditRubric, setQEditRubric] = useState<{ id: string; label: string; max_points: number }[]>([]);
 
   const [uploadError, setUploadError] = useState("");
   const [uploadDetails, setUploadDetails] = useState<string[]>([]);
@@ -56,6 +60,20 @@ export default function TestDetailPage() {
   const [showMine, setShowMine] = useState(false);
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+
+  const [copySearch, setCopySearch] = useState("");
+  const [copySourceQuestions, setCopySourceQuestions] = useState<any[]>([]);
+  const [copyLoading, setCopyLoading] = useState(false);
+  const [copySelected, setCopySelected] = useState<string[]>([]);
+  const [copyError, setCopyError] = useState("");
+
+  const [sections, setSections] = useState<any[]>([]);
+  const [sectionEditing, setSectionEditing] = useState<string | null>(null);
+  const [sectionTitle, setSectionTitle] = useState("");
+  const [sectionTime, setSectionTime] = useState(30);
+  const [sectionQuestionIds, setSectionQuestionIds] = useState<string[]>([]);
+  const [sectionBusy, setSectionBusy] = useState(false);
+  const [sectionError, setSectionError] = useState("");
 
   async function loadPublishedClasses() {
     const res = await fetch(`/api/tests/${id}/classes`);
@@ -91,6 +109,38 @@ export default function TestDetailPage() {
     e.target.value = "";
   }
 
+  async function loadCopySource() {
+    setCopyLoading(true);
+    setCopyError("");
+    const res = await fetch(`/api/questions/feed?search=${encodeURIComponent(copySearch)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setCopySourceQuestions(data ?? []);
+    } else {
+      setCopySourceQuestions([]);
+    }
+    setCopyLoading(false);
+  }
+
+  async function copySelectedQuestions() {
+    if (copySelected.length === 0) return;
+    setBulkDeleteLoading(true);
+    const res = await fetch("/api/questions/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question_ids: copySelected, target_test_id: id }),
+    });
+    setBulkDeleteLoading(false);
+    if (!res.ok) {
+      const body = await res.json();
+      showToast(body.error ?? "Copy failed", "error");
+      return;
+    }
+    showToast(`Copied ${copySelected.length} question(s)`);
+    setCopySelected([]);
+    loadQuestions();
+  }
+
   function loadQuestions() {
     const params = new URLSearchParams();
     params.set("test_id", id);
@@ -110,7 +160,7 @@ export default function TestDetailPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/tests?class_id=`).then((r) => r.ok ? r.json() : []),
+      fetch(`/api/tests?class_id=`).then((r) => r.ok ? r.json() : { data: [] }).then((d) => d.data ?? []),
       fetch(`/api/tests/${id}/classes`).then((r) => r.ok ? r.json() : []),
       fetch(`/api/tests/${id}/attempts`).then((r) => r.ok ? r.json() : { count: 0 }),
     ]).then(([all, classesData, attemptsData]) => {
@@ -127,6 +177,7 @@ export default function TestDetailPage() {
     }).catch(() => {});
     loadQuestions();
     loadAllClasses();
+    loadSections();
   }, [id, showMine]);
 
   async function addQuestion(e: React.FormEvent) {
@@ -139,6 +190,9 @@ export default function TestDetailPage() {
       body.correct_answer = correct;
     } else if (type === "fill_blank") {
       body.correct_answer = correct;
+      body.acceptable_answers = acceptableAnswers.map((a) => a.trim()).filter((a) => a.length > 0);
+    } else if (type === "essay") {
+      body.rubric = rubricCriteria.filter((c) => c.label.trim() && c.max_points > 0);
     }
 
     const res = await fetch("/api/questions", {
@@ -196,6 +250,8 @@ export default function TestDetailPage() {
         opens_at: editOpens || null,
         closes_at: editCloses || null,
         class_ids: editClassIds,
+        randomize_questions: (test as any).randomize_questions ?? false,
+        randomize_options: (test as any).randomize_options ?? false,
       }),
     });
     setBusy(false);
@@ -226,11 +282,72 @@ export default function TestDetailPage() {
     router.push("/dashboard/tests");
   }
 
+  async function loadSections() {
+    const res = await fetch(`/api/tests/${id}/sections`);
+    if (res.ok) {
+      const data = await res.json();
+      setSections(data ?? []);
+    }
+  }
+
+  async function saveSection() {
+    if (!test) return;
+    setSectionBusy(true);
+    setSectionError("");
+    const payload: any = {
+      title: sectionTitle,
+      time_limit_minutes: sectionTime,
+      question_ids: sectionQuestionIds,
+    };
+    if (sectionEditing) {
+      payload.section_id = sectionEditing;
+    }
+    const res = await fetch(`/api/tests/${test.id}/sections`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setSectionBusy(false);
+    if (!res.ok) {
+      const body = await res.json();
+      setSectionError(body.error ?? "Failed to save section");
+      return;
+    }
+    showToast(sectionEditing ? "Section updated" : "Section added");
+    setSectionEditing(null);
+    setSectionTitle("");
+    setSectionTime(30);
+    setSectionQuestionIds([]);
+    loadSections();
+  }
+
+  function startSectionEdit(section: any) {
+    setSectionEditing(section.id);
+    setSectionTitle(section.title);
+    setSectionTime(section.time_limit_minutes);
+    setSectionQuestionIds(section.question_ids ?? []);
+  }
+
+  async function deleteSection(sectionId: string) {
+    if (!test) return;
+    setSectionBusy(true);
+    const res = await fetch(`/api/tests/${test.id}/sections?section_id=${sectionId}`, { method: "DELETE" });
+    setSectionBusy(false);
+    if (!res.ok) {
+      showToast("Failed to delete section", "error");
+      return;
+    }
+    showToast("Section deleted");
+    loadSections();
+  }
+
   function startQEdit(q: Question) {
     setQModal({ mode: "edit", question: q });
     setQEditContent(q.content);
     setQEditPoints(q.points);
     setQEditCorrect(q.correct_answer || "");
+    setQEditAcceptableAnswers(q.acceptable_answers && q.acceptable_answers.length > 0 ? q.acceptable_answers : [""]);
+    setQEditRubric((q.rubric && q.rubric.length > 0 ? q.rubric : [{ id: crypto.randomUUID(), label: "", max_points: 0 }]).map((c: any) => ({ id: c.id ?? crypto.randomUUID(), label: c.label ?? "", max_points: Number(c.max_points ?? 0) })));
   }
 
   async function saveQEdit(e: React.FormEvent) {
@@ -239,7 +356,7 @@ export default function TestDetailPage() {
     const res = await fetch(`/api/questions/${qModal.question.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: qEditContent, points: qEditPoints, correct_answer: qEditCorrect || null }),
+      body: JSON.stringify({ content: qEditContent, points: qEditPoints, correct_answer: qEditCorrect || null, acceptable_answers: qModal.question.type === "fill_blank" ? qEditAcceptableAnswers.map((a) => a.trim()).filter((a) => a.length > 0) : null, rubric: qModal.question.type === "essay" ? qEditRubric.filter((c) => c.label.trim() && c.max_points > 0) : null }),
     });
     if (!res.ok) {
       showToast("Failed to update question", "error");
@@ -329,6 +446,16 @@ export default function TestDetailPage() {
           </div>
           <input type="number" value={editTime} onChange={(e) => setEditTime(Number(e.target.value))} min="1"
             className="w-32 rounded-lg border border-rfcm-yellow-soft px-3 py-2 outline-none focus:border-rfcm-red" />
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 text-sm text-rfcm-charcoal/70">
+              <input type="checkbox" checked={(test as any).randomize_questions ?? false} onChange={(e) => setTest({ ...(test as any), randomize_questions: e.target.checked })} />
+              Randomize question order
+            </label>
+            <label className="flex items-center gap-2 text-sm text-rfcm-charcoal/70">
+              <input type="checkbox" checked={(test as any).randomize_options ?? false} onChange={(e) => setTest({ ...(test as any), randomize_options: e.target.checked })} />
+              Randomize option order
+            </label>
+          </div>
           <div>
             <p className="text-xs text-rfcm-charcoal/60 mb-1">Published to classes</p>
             <div className="max-h-32 overflow-y-auto border border-rfcm-yellow-soft rounded-lg p-2 space-y-1">
@@ -365,6 +492,76 @@ export default function TestDetailPage() {
         </div>
       )}
 
+      <div className="bg-white rounded-xl border border-rfcm-yellow-soft p-5 mb-6 max-w-4xl">
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-semibold text-sm">Sections</p>
+          {!sectionEditing && (
+            <button type="button" onClick={() => { setSectionEditing("new"); setSectionTitle(""); setSectionTime(30); setSectionQuestionIds([]); setSectionError(""); }}
+              className="text-xs text-rfcm-red font-medium hover:underline">+ Add section</button>
+          )}
+        </div>
+        {sectionError && <p className="text-xs text-rfcm-red mb-2">{sectionError}</p>}
+        {sectionEditing === "new" && (
+          <div className="space-y-3 border-t border-rfcm-yellow-soft pt-4">
+            <input value={sectionTitle} onChange={(e) => setSectionTitle(e.target.value)} placeholder="Section title" required
+              className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+            <input type="number" value={sectionTime} onChange={(e) => setSectionTime(Number(e.target.value))} min="1"
+              className="w-32 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+            <div className="max-h-40 overflow-y-auto border border-rfcm-yellow-soft rounded-lg p-2 space-y-1">
+              {questions.map((q) => (
+                <label key={q.id} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={sectionQuestionIds.includes(q.id)} onChange={() => setSectionQuestionIds((prev) => prev.includes(q.id) ? prev.filter((x) => x !== q.id) : [...prev, q.id])} className="accent-rfcm-red" />
+                  <span className="text-sm text-rfcm-charcoal">{q.content}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={saveSection} disabled={sectionBusy} className="rounded-lg bg-rfcm-red text-white text-sm font-medium px-4 py-2 disabled:opacity-50">{sectionBusy ? "Saving..." : "Save section"}</button>
+              <button type="button" onClick={() => { setSectionEditing(null); setSectionError(""); }} className="rounded-lg border border-rfcm-yellow-soft px-4 py-2 text-sm font-medium">Cancel</button>
+            </div>
+          </div>
+        )}
+        {sectionEditing && sectionEditing !== "new" && (
+          <div className="space-y-3 border-t border-rfcm-yellow-soft pt-4">
+            <input value={sectionTitle} onChange={(e) => setSectionTitle(e.target.value)} placeholder="Section title" required
+              className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+            <input type="number" value={sectionTime} onChange={(e) => setSectionTime(Number(e.target.value))} min="1"
+              className="w-32 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+            <div className="max-h-40 overflow-y-auto border border-rfcm-yellow-soft rounded-lg p-2 space-y-1">
+              {questions.map((q) => (
+                <label key={q.id} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={sectionQuestionIds.includes(q.id)} onChange={() => setSectionQuestionIds((prev) => prev.includes(q.id) ? prev.filter((x) => x !== q.id) : [...prev, q.id])} className="accent-rfcm-red" />
+                  <span className="text-sm text-rfcm-charcoal">{q.content}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={saveSection} disabled={sectionBusy} className="rounded-lg bg-rfcm-red text-white text-sm font-medium px-4 py-2 disabled:opacity-50">{sectionBusy ? "Saving..." : "Update section"}</button>
+              <button type="button" onClick={() => { setSectionEditing(null); setSectionError(""); }} className="rounded-lg border border-rfcm-yellow-soft px-4 py-2 text-sm font-medium">Cancel</button>
+            </div>
+          </div>
+        )}
+        {!sectionEditing && sections.length === 0 && (
+          <p className="text-xs text-rfcm-charcoal/50">No sections defined. The exam will present all questions in one continuous flow.</p>
+        )}
+        {!sectionEditing && sections.length > 0 && (
+          <div className="space-y-2">
+            {sections.map((s, i) => (
+              <div key={s.id} className="flex items-center justify-between p-3 rounded-lg border border-rfcm-yellow-soft">
+                <div>
+                  <p className="text-sm font-medium">{i + 1}. {s.title}</p>
+                  <p className="text-xs text-rfcm-charcoal/50">{s.time_limit_minutes} min · {(s.question_ids ?? []).length} question(s)</p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => startSectionEdit(s)} className="text-xs text-rfcm-red font-medium hover:underline">Edit</button>
+                  <button type="button" onClick={() => deleteSection(s.id)} disabled={sectionBusy} className="text-xs text-rfcm-charcoal/60 hover:text-rfcm-red font-medium">Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="grid md:grid-cols-2 gap-6 max-w-4xl">
         <div className="space-y-6">
           <form onSubmit={addQuestion} className="bg-white rounded-xl border border-rfcm-yellow-soft p-5 space-y-3">
@@ -375,6 +572,26 @@ export default function TestDetailPage() {
           </select>
           <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Question text" required
             className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" rows={2} />
+
+          {type === "essay" && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-rfcm-charcoal/70">Rubric criteria</p>
+              {rubricCriteria.map((c, i) => (
+                <div key={c.id} className="flex gap-2">
+                  <input value={c.label} onChange={(e) => setRubricCriteria((prev) => prev.map((item, idx) => (idx === i ? { ...item, label: e.target.value } : item)))}
+                    placeholder="Criterion label"
+                    className="flex-1 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+                  <input type="number" value={c.max_points} onChange={(e) => setRubricCriteria((prev) => prev.map((item, idx) => (idx === i ? { ...item, max_points: Number(e.target.value) } : item)))}
+                    placeholder="Max pts" min="0"
+                    className="w-20 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+                  <button type="button" onClick={() => setRubricCriteria((prev) => prev.filter((_, idx) => idx !== i))}
+                    className="text-xs text-rfcm-red font-medium px-2">Remove</button>
+                </div>
+              ))}
+              <button type="button" onClick={() => setRubricCriteria((prev) => [...prev, { id: crypto.randomUUID(), label: "", max_points: 0 }])}
+                className="text-xs text-rfcm-red font-medium hover:underline">+ Add criterion</button>
+            </div>
+          )}
 
           {type === "mcq" && (
             <div className="space-y-2">
@@ -401,8 +618,23 @@ export default function TestDetailPage() {
           )}
 
           {type === "fill_blank" && (
-            <input value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="Correct answer" required
-              className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+            <div className="space-y-2">
+              <input value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="Primary correct answer"
+                className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+              <div className="space-y-1">
+                {acceptableAnswers.map((ans, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input value={ans} onChange={(e) => setAcceptableAnswers((a) => a.map((v, idx) => (idx === i ? e.target.value : v)))}
+                      placeholder={`Acceptable answer ${i + 1}`}
+                      className="flex-1 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+                    <button type="button" onClick={() => setAcceptableAnswers((a) => a.filter((_, idx) => idx !== i))}
+                      className="text-xs text-rfcm-red font-medium px-2">Remove</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setAcceptableAnswers((a) => [...a, ""])}
+                  className="text-xs text-rfcm-red font-medium hover:underline">+ Add another acceptable answer</button>
+              </div>
+            </div>
           )}
 
           <div className="flex items-center gap-2">
@@ -429,6 +661,36 @@ export default function TestDetailPage() {
             )}
             {uploadSuccess !== null && (
               <p className="text-xs text-green-700">✓ Added {uploadSuccess} question(s) from the file</p>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl border border-rfcm-yellow-soft p-5 space-y-3">
+            <p className="font-semibold text-sm">Copy from another exam</p>
+            <div className="flex gap-2">
+              <input value={copySearch} onChange={(e) => setCopySearch(e.target.value)} placeholder="Search questions across all exams"
+                className="flex-1 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+              <button type="button" onClick={loadCopySource} disabled={copyLoading} className="rounded-lg border border-rfcm-yellow-soft px-3 py-2 text-sm font-medium disabled:opacity-50">
+                {copyLoading ? "Searching..." : "Search"}
+              </button>
+            </div>
+            {copyError && <p className="text-xs text-rfcm-red">{copyError}</p>}
+            {copySourceQuestions.length > 0 && (
+              <div className="space-y-2">
+                <div className="max-h-48 overflow-y-auto border border-rfcm-yellow-soft rounded-lg divide-y divide-rfcm-cream-dark">
+                  {copySourceQuestions.map((q) => (
+                    <label key={q.id} className="flex items-center gap-3 p-2 cursor-pointer hover:bg-rfcm-cream-dark/30">
+                      <input type="checkbox" checked={copySelected.includes(q.id)} onChange={() => setCopySelected((s) => s.includes(q.id) ? s.filter((x) => x !== q.id) : [...s, q.id])} />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{q.content}</p>
+                        <p className="text-xs text-rfcm-charcoal/50">{(q.tests?.title ?? "Unknown")} · {q.type} · {q.points} pt(s)</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                <button type="button" onClick={copySelectedQuestions} disabled={copySelected.length === 0 || bulkDeleteLoading} className="rounded-lg bg-rfcm-red text-white text-sm font-medium px-4 py-2 disabled:opacity-50">
+                  {bulkDeleteLoading ? "Copying..." : `Add selected to this exam (${copySelected.length})`}
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -481,9 +743,47 @@ export default function TestDetailPage() {
               <input type="number" value={qEditPoints} onChange={(e) => setQEditPoints(Number(e.target.value))}
                 className="w-20 rounded-lg border border-rfcm-yellow-soft px-2 py-1" />
             </div>
-            {qModal.question.type !== "essay" && (
+            {qModal.question.type !== "essay" && qModal.question.type !== "fill_blank" && (
               <input value={qEditCorrect} onChange={(e) => setQEditCorrect(e.target.value)} placeholder="Correct answer"
                 className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+            )}
+            {qModal.question.type === "fill_blank" && (
+              <div className="space-y-2">
+                <input value={qEditCorrect} onChange={(e) => setQEditCorrect(e.target.value)} placeholder="Primary correct answer"
+                  className="w-full rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+                <div className="space-y-1">
+                  {qEditAcceptableAnswers.map((ans, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input value={ans} onChange={(e) => setQEditAcceptableAnswers((a) => a.map((v, idx) => (idx === i ? e.target.value : v)))}
+                        placeholder={`Acceptable answer ${i + 1}`}
+                        className="flex-1 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+                      <button type="button" onClick={() => setQEditAcceptableAnswers((a) => a.filter((_, idx) => idx !== i))}
+                        className="text-xs text-rfcm-red font-medium px-2">Remove</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setQEditAcceptableAnswers((a) => [...a, ""])}
+                    className="text-xs text-rfcm-red font-medium hover:underline">+ Add another acceptable answer</button>
+                </div>
+              </div>
+            )}
+            {qModal.question.type === "essay" && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-rfcm-charcoal/70">Rubric criteria</p>
+                {qEditRubric.map((c, i) => (
+                  <div key={c.id} className="flex gap-2">
+                    <input value={c.label} onChange={(e) => setQEditRubric((prev) => prev.map((item, idx) => (idx === i ? { ...item, label: e.target.value } : item)))}
+                      placeholder="Criterion label"
+                      className="flex-1 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+                    <input type="number" value={c.max_points} onChange={(e) => setQEditRubric((prev) => prev.map((item, idx) => (idx === i ? { ...item, max_points: Number(e.target.value) } : item)))}
+                      placeholder="Max pts" min="0"
+                      className="w-20 rounded-lg border border-rfcm-yellow-soft px-3 py-2" />
+                    <button type="button" onClick={() => setQEditRubric((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-xs text-rfcm-red font-medium px-2">Remove</button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setQEditRubric((prev) => [...prev, { id: crypto.randomUUID(), label: "", max_points: 0 }])}
+                  className="text-xs text-rfcm-red font-medium hover:underline">+ Add criterion</button>
+              </div>
             )}
             <div className="flex gap-2">
               <button type="submit" className="flex-1 rounded-md bg-rfcm-red text-white py-2 font-medium">Save</button>

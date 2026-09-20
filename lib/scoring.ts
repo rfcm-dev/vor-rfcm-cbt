@@ -4,6 +4,7 @@ type Question = {
   id: string;
   type: "mcq" | "true_false" | "fill_blank" | "essay";
   correct_answer: string | null;
+  acceptable_answers?: string[] | null;
   points: number;
 };
 
@@ -18,8 +19,10 @@ export function autoScore(question: Question, response: string | null): number |
   }
 
   if (question.type === "fill_blank") {
-    // Exact match after normalization. Consider fuzzy/alternate-answer matching later.
-    return normalize(response) === normalize(question.correct_answer ?? "") ? question.points : 0;
+    const accepted = (question.acceptable_answers && question.acceptable_answers.length > 0)
+      ? question.acceptable_answers
+      : (question.correct_answer ? [question.correct_answer] : []);
+    return accepted.some((ans) => normalize(ans) === normalize(response)) ? question.points : 0;
   }
 
   return null;

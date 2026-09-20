@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 type Question = { id: string; type: string; content: string; options: { id: string; text: string }[] | null };
+type Section = { id: string; title: string; time_limit_minutes: number; question_ids: string[] };
 
 function TakeExamInner() {
   const searchParams = useSearchParams();
@@ -12,9 +13,11 @@ function TakeExamInner() {
   const studentId = searchParams.get("student_id") ?? "";
 
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [marked, setMarked] = useState<Set<string>>(new Set());
   const [current, setCurrent] = useState(0);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [deadline, setDeadline] = useState<number | null>(null);
@@ -25,8 +28,14 @@ function TakeExamInner() {
   const [savedTick, setSavedTick] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [initError, setInitError] = useState("");
+  const [sectionDeadline, setSectionDeadline] = useState<number | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submittingRef = useRef(false);
+
+  const currentSection = sections[currentSectionIndex] ?? null;
+  const sectionQuestionIds = currentSection?.question_ids ?? questions.map((q) => q.id);
+  const sectionQuestions = questions.filter((q) => sectionQuestionIds.includes(q.id));
+  const sectionAnsweredCount = sectionQuestions.filter((q) => answers[q.id]?.trim()).length;
 
   useEffect(() => {
     if (!testId || !studentId) {
@@ -53,12 +62,25 @@ function TakeExamInner() {
         setAttemptId(body.attempt.id);
         if (body.attempt.draft_answers) setAnswers(body.attempt.draft_answers);
 
-        const startedAt = new Date(body.attempt.started_at).getTime();
-        const absoluteDeadline = startedAt + body.test.time_limit_minutes * 60 * 1000;
-        setDeadline(absoluteDeadline);
-        setSecondsLeft(Math.max(0, (absoluteDeadline - Date.now()) / 1000));
+        const sectionsData = body.test.sections && Array.isArray(body.test.sections) ? body.test.sections : [];
+        setSections(sectionsData);
 
-        const qRes = await fetch(`/api/questions?test_id=${body.test.id}`);
+        const startedAt = new Date(body.attempt.started_at).getTime();
+        if (sectionsData.length > 0 && sectionsData[0]) {
+          const sectionDeadlineMs = startedAt + sectionsData[0].time_limit_minutes * 60 * 1000;
+          setSectionDeadline(sectionDeadlineMs);
+          setSecondsLeft(Math.max(0, (sectionDeadlineMs - Date.now()) / 1000));
+        } else {
+          const absoluteDeadline = startedAt + body.test.time_limit_minutes * 60 * 1000;
+          setDeadline(absoluteDeadline);
+          setSecondsLeft(Math.max(0, (absoluteDeadline - Date.now()) / 1000));
+        }
+
+        if (sectionsData.length > 0) {
+          setCurrentSectionIndex(0);
+        }
+
+        const qRes = await fetch(`/api/questions?test_id=${body.test.id}&seed=${body.attempt.randomization_seed}&randomize_questions=${body.test.randomize_questions ? "1" : "0"}&randomize_options=${body.test.randomize_options ? "1" : "0"}`);
         const qData = await qRes.json();
         setQuestions(qData);
       } catch (e: any) {
@@ -121,10 +143,13 @@ function TakeExamInner() {
       if (!attemptId || submitted || submittingRef.current) return;
       submittingRef.current = true;
       try {
+        const activeQuestions = sections.length > 0 ? sectionQuestions : questions;
         const payload = {
           attempt_id: attemptId,
           auto_submitted: autoSubmitted,
-          answers: Object.entries(answers).map(([question_id, response]) => ({ question_id, response })),
+          answers: Object.entries(answers)
+            .filter(([question_id]) => activeQuestions.some((q) => q.id === question_id))
+            .map(([question_id, response]) => ({ question_id, response })),
         };
 
         const maxRetries = 3;
@@ -156,21 +181,19 @@ function TakeExamInner() {
         submittingRef.current = false;
       }
     },
-    [attemptId, answers, submitted]
+    [attemptId, answers, submitted, sections, sectionQuestions, questions]
   );
 
   useEffect(() => {
-    if (secondsLeft === null || submitted) return;
-    if (secondsLeft <= 0) { submit(true); return; }
+    if (submitted) return;
+    const activeDeadline = sections.length > 0 ? sectionDeadline : deadline;
+    if (activeDeadline === null) return;
+    if (activeDeadline <= Date.now()) { submit(true); return; }
     const t = setTimeout(() => {
-      if (deadline) {
-        setSecondsLeft(Math.max(0, (deadline - Date.now()) / 1000));
-      } else {
-        setSecondsLeft((s) => (s ?? 1) - 1);
-      }
+      setSecondsLeft(Math.max(0, (activeDeadline - Date.now()) / 1000));
     }, 1000);
     return () => clearTimeout(t);
-  }, [secondsLeft, submit, submitted, deadline]);
+  }, [submitted, sectionDeadline, deadline, submit]);
 
   if (submitted) {
     return (
@@ -238,13 +261,14 @@ function TakeExamInner() {
     );
   }
 
-  const q = questions[current];
+  const q = sectionQuestions[current] || sectionQuestions[0];
   const answeredCount = Object.keys(answers).filter((id) => answers[id]?.trim()).length;
-  const totalSeconds = secondsLeft !== null ? Math.max(0, Math.round(secondsLeft)) : 0;
+  const totalSeconds = sectionDeadline !== null ? Math.max(0, Math.round(sectionDeadline - Date.now())) : (secondsLeft !== null ? Math.max(0, Math.round(secondsLeft)) : 0);
   const minutes = totalSeconds > 0 ? Math.floor(totalSeconds / 60) : 0;
   const seconds = totalSeconds % 60;
-  const timeLow = secondsLeft !== null && secondsLeft <= 300;
-  const progress = questions.length > 0 ? ((current + 1) / questions.length) * 100 : 0;
+  const timeLow = sectionDeadline !== null ? sectionDeadline - Date.now() <= 300 : secondsLeft !== null && secondsLeft <= 300;
+  const progress = sectionQuestions.length > 0 ? ((current + 1) / sectionQuestions.length) * 100 : 0;
+  const sectionComplete = sectionQuestions.length > 0 && sectionAnsweredCount === sectionQuestions.length;
 
   return (
     <main className="min-h-screen bg-rfcm-cream">
@@ -257,10 +281,12 @@ function TakeExamInner() {
       <div className="max-w-6xl mx-auto p-4 md:p-6">
         <div className="mb-6 bg-white/80 backdrop-blur-sm border border-rfcm-yellow-soft rounded-2xl shadow-sm p-4">
           <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="font-serif text-lg font-bold text-rfcm-charcoal">Examination</h1>
-              <p className="text-xs text-rfcm-charcoal/60">Question {current + 1} of {questions.length}</p>
-            </div>
+              <div>
+                <h1 className="font-serif text-lg font-bold text-rfcm-charcoal">Examination</h1>
+                <p className="text-xs text-rfcm-charcoal/60">
+                  {currentSection ? `${currentSection.title} — Question ${current + 1} of ${sectionQuestions.length}` : `Question ${current + 1} of ${sectionQuestions.length}`}
+                </p>
+              </div>
             <div className="flex items-center gap-3">
               {savedTick && (
                 <span className="text-xs text-green-600 font-medium flex items-center gap-1">
@@ -294,7 +320,7 @@ function TakeExamInner() {
                 <div key={current} className="space-y-6 animate-question-in">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/50 mb-3">
-                    Question {current + 1}
+                    {currentSection ? `${currentSection.title} — Question ${current + 1}` : `Question ${current + 1}`}
                   </p>
                   <p className="text-lg font-medium text-rfcm-charcoal leading-relaxed">{q.content}</p>
                 </div>
@@ -344,9 +370,24 @@ function TakeExamInner() {
                   <div className="flex gap-2">
                     <button disabled={current === 0} onClick={() => setCurrent((c) => c - 1)}
                       className="px-5 py-2.5 rounded-xl border border-rfcm-yellow-soft disabled:opacity-40 hover:bg-rfcm-cream-dark transition-colors font-medium text-sm">Back</button>
-                    {current < questions.length - 1 ? (
+                    {current < sectionQuestions.length - 1 ? (
                       <button onClick={() => setCurrent((c) => c + 1)}
                         className="px-5 py-2.5 rounded-xl bg-rfcm-red text-white font-medium hover:bg-rfcm-red-dark transition-colors text-sm">Next</button>
+                    ) : sectionComplete && currentSectionIndex < sections.length - 1 ? (
+                      <button onClick={() => {
+                        const nextSection = sections[currentSectionIndex + 1];
+                        if (nextSection) {
+                          const nextDeadline = Date.now() + nextSection.time_limit_minutes * 60 * 1000;
+                          setSectionDeadline(nextDeadline);
+                          setSecondsLeft(Math.max(0, (nextDeadline - Date.now()) / 1000));
+                        }
+                        setCurrentSectionIndex((s) => s + 1);
+                        setCurrent(0);
+                      }}
+                        className="px-5 py-2.5 rounded-xl bg-rfcm-red text-white font-medium hover:bg-rfcm-red-dark transition-colors text-sm">Next Section</button>
+                    ) : sectionComplete ? (
+                      <button onClick={() => setShowReview(true)}
+                        className="px-5 py-2.5 rounded-xl bg-rfcm-red text-white font-medium hover:bg-rfcm-red-dark transition-colors text-sm">Review &amp; Submit</button>
                     ) : (
                       <button onClick={() => setShowReview(true)}
                         className="px-5 py-2.5 rounded-xl bg-rfcm-red text-white font-medium hover:bg-rfcm-red-dark transition-colors text-sm">Review &amp; Submit</button>
@@ -359,11 +400,13 @@ function TakeExamInner() {
 
           <div className="w-full lg:w-72 bg-white/80 backdrop-blur-sm border border-rfcm-yellow-soft rounded-2xl shadow-sm p-5 h-fit">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60">Questions</p>
-              <span className="text-xs text-rfcm-charcoal/50">{answeredCount}/{questions.length}</span>
+              <p className="text-xs font-semibold uppercase tracking-wide text-rfcm-charcoal/60">
+                {currentSection ? currentSection.title : "Questions"}
+              </p>
+              <span className="text-xs text-rfcm-charcoal/50">{sectionAnsweredCount}/{sectionQuestions.length}</span>
             </div>
             <div className="grid grid-cols-5 lg:grid-cols-4 gap-2 mb-4">
-              {questions.map((qq, i) => {
+              {sectionQuestions.map((qq, i) => {
                 const answered = !!answers[qq.id]?.trim();
                 const isMarked = marked.has(qq.id);
                 return (
@@ -374,6 +417,21 @@ function TakeExamInner() {
                 );
               })}
             </div>
+            {sections.length > 0 && currentSectionIndex < sections.length - 1 && sectionComplete && (
+              <button onClick={() => {
+                const nextSection = sections[currentSectionIndex + 1];
+                if (nextSection) {
+                  const nextDeadline = Date.now() + nextSection.time_limit_minutes * 60 * 1000;
+                  setSectionDeadline(nextDeadline);
+                  setSecondsLeft(Math.max(0, (nextDeadline - Date.now()) / 1000));
+                }
+                setCurrentSectionIndex((s) => s + 1);
+                setCurrent(0);
+              }}
+                className="w-full rounded-xl bg-rfcm-red text-white text-sm font-medium py-3 hover:bg-rfcm-red-dark transition-colors mb-2">
+                Continue to next section
+              </button>
+            )}
             <button onClick={() => setShowReview(true)}
               className="w-full rounded-xl bg-rfcm-charcoal text-white text-sm font-medium py-3 hover:bg-rfcm-charcoal/90 transition-colors">
               Submit Exam
@@ -392,9 +450,9 @@ function TakeExamInner() {
             </div>
             <h3 className="font-serif text-2xl font-bold text-center mb-2 text-rfcm-charcoal">Submit Exam?</h3>
             <p className="text-sm text-rfcm-charcoal/70 text-center mb-6">
-              You have answered <span className="font-bold text-rfcm-red">{answeredCount} / {questions.length}</span> questions.
-              {questions.length - answeredCount > 0 && (
-                <span className="block mt-1 text-amber-600">{questions.length - answeredCount} question(s) unanswered</span>
+              You have answered <span className="font-bold text-rfcm-red">{sectionAnsweredCount} / {sectionQuestions.length}</span> questions.
+              {sectionQuestions.length - sectionAnsweredCount > 0 && (
+                <span className="block mt-1 text-amber-600">{sectionQuestions.length - sectionAnsweredCount} question(s) unanswered</span>
               )}
             </p>
             <div className="flex gap-3">

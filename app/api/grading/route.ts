@@ -3,73 +3,109 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
+import { getAttemptOverview } from "@/lib/attempt-overview";
+import { deriveAttemptView } from "@/lib/attempt-status";
 
-// GET: list ungraded essay answers (the grading queue), optionally filtered by test_id.
-// POST: submit a manual score for one essay answer.
 export async function GET(req: NextRequest) {
-  const user = await getSessionUser();
-  const testId = req.nextUrl.searchParams.get("test_id");
-  const includeGraded = req.nextUrl.searchParams.get("all") === "1" && ["superadmin", "admin"].includes(user?.role ?? "");
+  try {
+    const user = await getSessionUser();
+    const testId = req.nextUrl.searchParams.get("test_id");
+    const includeGraded = req.nextUrl.searchParams.get("all") === "1" && ["superadmin", "admin"].includes(user?.role ?? "");
 
-  let essayQuestionsQuery = db.from("questions").select("id, test_id, type, content, points").eq("type", "essay");
-  if (testId) essayQuestionsQuery = essayQuestionsQuery.eq("test_id", testId);
-  const { data: essayQuestions } = await essayQuestionsQuery;
-  const essayQuestionIds = Array.from(new Set((essayQuestions ?? []).map((q: any) => q.id).filter(Boolean)));
+    let essayQuestionsQuery = db.from("questions").select("id, test_id, type, content, points").eq("type", "essay");
+    if (testId) essayQuestionsQuery = essayQuestionsQuery.eq("test_id", testId);
+    const { data: essayQuestions } = await essayQuestionsQuery;
+    const essayQuestionIds = Array.from(new Set((essayQuestions ?? []).map((q: any) => q.id).filter(Boolean)));
 
-  let answersQuery = db.from("answers").select("*");
-  if (!includeGraded) answersQuery = answersQuery.is("manual_score", null);
-  const { data: answers, error } = essayQuestionIds.length > 0
-    ? await answersQuery.in("question_id", essayQuestionIds)
-    : { data: [] as any[], error: null as any };
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    let answersQuery = db.from("answers").select("*");
+    if (!includeGraded) answersQuery = answersQuery.is("manual_score", null);
+    const { data: answers, error } = essayQuestionIds.length > 0
+      ? await answersQuery.in("question_id", essayQuestionIds)
+      : { data: [] as any[], error: null as any };
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const attemptIds = Array.from(new Set((answers ?? []).map((a: any) => a.attempt_id).filter(Boolean)));
-  const { data: overviewRows } = attemptIds.length > 0
-    ? await db.from("attempt_overview").select("*").in("attempt_id", attemptIds)
-    : { data: [] as any[] };
+    const attemptIds = Array.from(new Set((answers ?? []).map((a: any) => a.attempt_id).filter(Boolean)));
+    const overviewRows = await getAttemptOverview({
+      stuckOnly: false,
+      includeInProgress: true,
+    });
+    const overviewMap = new Map((overviewRows ?? []).map((r: any) => [r.attempt_id, r]));
 
-  const overviewMap = new Map((overviewRows ?? []).map((r: any) => [r.attempt_id, r]));
+    const enriched = (answers ?? []).map((a: any) => {
+      const overview = overviewMap.get(a.attempt_id);
+      const question = essayQuestions?.find((q: any) => q.id === a.question_id);
+      const view = overview ? deriveAttemptView({
+        attempt_id: overview.attempt_id,
+        test_id: overview.test_id,
+        student_id: overview.student_id,
+        test_title: overview.test_title ?? "Unknown",
+        student_name: overview.student_name ?? "Unknown",
+        class_id: overview.class_id ?? "",
+        class_name: overview.class_name ?? "",
+        attempt_status: overview.attempt_status,
+        result_status: overview.result_status,
+        total_score: overview.total_score,
+        released_at: overview.released_at,
+        started_at: overview.started_at,
+        submitted_at: overview.submitted_at,
+        time_limit_minutes: overview.time_limit_minutes ?? 30,
+        total_possible_points: overview.total_possible_points ?? 0,
+        essay_total: overview.essay_total ?? 0,
+        essays_graded: overview.essays_graded ?? 0,
+      }) : null;
+      return {
+        ...a,
+        questions: question
+          ? {
+              ...question,
+              tests: overview
+                ? {
+                    title: overview.test_title,
+                  }
+                : null,
+            }
+          : null,
+        attempts: overview
+          ? {
+              students: {
+                name: overview.student_name,
+              },
+            }
+          : null,
+        attempt_view: view,
+      };
+    });
 
-  const enriched = (answers ?? []).map((a: any) => {
-    const overview = overviewMap.get(a.attempt_id);
-    const question = essayQuestions?.find((q: any) => q.id === a.question_id);
-    return {
-      ...a,
-      questions: question
-        ? {
-            ...question,
-            tests: overview
-              ? {
-                  title: overview.test_title,
-                }
-              : null,
-          }
-        : null,
-      attempts: overview
-        ? {
-            students: {
-              name: overview.student_name,
-            },
-          }
-        : null,
-    };
-  });
-
-  return NextResponse.json(enriched);
+    return NextResponse.json(enriched);
+  } catch (e: any) {
+    console.error("Grading error:", e);
+    return NextResponse.json({ error: e.message ?? "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { answer_id, manual_score } = await req.json();
-  if (!answer_id || typeof manual_score !== "number") {
-    return NextResponse.json({ error: "answer_id and manual_score are required" }, { status: 400 });
+  const { answer_id, manual_score, rubric_scores } = await req.json();
+  if (!answer_id) {
+    return NextResponse.json({ error: "answer_id is required" }, { status: 400 });
+  }
+
+  const updateData: any = { graded_by: user.id, graded_at: new Date().toISOString() };
+
+  if (Array.isArray(rubric_scores) && rubric_scores.length > 0) {
+    updateData.rubric_scores = rubric_scores;
+    updateData.manual_score = rubric_scores.reduce((sum: number, s: any) => sum + (Number(s.score) || 0), 0);
+  } else if (typeof manual_score === "number") {
+    updateData.manual_score = manual_score;
+  } else {
+    return NextResponse.json({ error: "manual_score or rubric_scores is required" }, { status: 400 });
   }
 
   const { error } = await db
     .from("answers")
-    .update({ manual_score, graded_by: user.id, graded_at: new Date().toISOString() })
+    .update(updateData)
     .eq("id", answer_id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

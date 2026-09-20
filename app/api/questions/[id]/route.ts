@@ -8,7 +8,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { content, options, correct_answer, points } = await req.json();
+  const { content, options, correct_answer, points, acceptable_answers, rubric } = await req.json();
 
   const { data: existing } = await db.from("questions").select("type").eq("id", params.id).single();
   if (!existing) return NextResponse.json({ error: "Question not found" }, { status: 404 });
@@ -18,6 +18,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (options !== undefined) updateData.options = options;
   if (correct_answer !== undefined) updateData.correct_answer = existing.type === "essay" ? null : correct_answer;
   if (points !== undefined) updateData.points = points;
+  if (acceptable_answers !== undefined) updateData.acceptable_answers = existing.type === "fill_blank" && Array.isArray(acceptable_answers) ? acceptable_answers : null;
+  if (rubric !== undefined) updateData.rubric = existing.type === "essay" && Array.isArray(rubric) ? rubric : null;
 
   const { data, error } = await db
     .from("questions")

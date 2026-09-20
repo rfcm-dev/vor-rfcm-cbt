@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
+import { seededShuffle } from "@/lib/shuffle";
 
 // GET: list questions for a test. POST: add a question (builder path).
 // File-upload parsing (Excel/Word template) is a separate route to add later —
@@ -26,14 +27,30 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+
+  const seed = req.nextUrl.searchParams.get("seed");
+  const randomizeQuestions = req.nextUrl.searchParams.get("randomize_questions") === "1";
+  const randomizeOptions = req.nextUrl.searchParams.get("randomize_options") === "1";
+
+  let result = data ?? [];
+  if (seed && randomizeQuestions) {
+    result = seededShuffle(result, seed);
+  }
+  if (seed && randomizeOptions) {
+    result = result.map((q: any) => {
+      if (!q.options || !Array.isArray(q.options)) return q;
+      return { ...q, options: seededShuffle(q.options, `${seed}-${q.id}`) };
+    });
+  }
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { test_id, type, content, options, correct_answer, points, order_index } = await req.json();
+  const { test_id, type, content, options, correct_answer, points, order_index, acceptable_answers } = await req.json();
   if (!test_id || !type || !content) {
     return NextResponse.json({ error: "test_id, type, and content are required" }, { status: 400 });
   }
@@ -46,6 +63,7 @@ export async function POST(req: NextRequest) {
       content,
       options: options ?? null,
       correct_answer: type === "essay" ? null : correct_answer,
+      acceptable_answers: type === "fill_blank" && Array.isArray(acceptable_answers) ? acceptable_answers : null,
       points: points ?? 1,
       order_index: order_index ?? 0,
       created_by: user.id,

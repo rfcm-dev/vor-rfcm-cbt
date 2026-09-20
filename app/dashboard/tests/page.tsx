@@ -25,7 +25,7 @@ export default function TestsPage() {
   useEffect(() => {
     setMounted(true);
     Promise.all([
-      fetch("/api/tests").then((r) => r.ok ? r.json() : []),
+      fetch("/api/tests").then((r) => r.ok ? r.json() : { data: [] }).then((d) => d.data ?? []),
       fetch("/api/classes").then((r) => r.ok ? r.json() : []),
     ]).then(([testsData, classesData]) => {
       setTests(testsData);
@@ -35,7 +35,7 @@ export default function TestsPage() {
 
   function load() {
     Promise.all([
-      fetch("/api/tests").then((r) => r.ok ? r.json() : []),
+      fetch("/api/tests").then((r) => r.ok ? r.json() : { data: [] }).then((d) => d.data ?? []),
       fetch("/api/classes").then((r) => r.ok ? r.json() : []),
     ]).then(([testsData, classesData]) => {
       setTests(testsData);

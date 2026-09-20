@@ -5,49 +5,75 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { autoScore } from "@/lib/scoring";
 import { getAttemptOverview } from "@/lib/attempt-overview";
+import { deriveAttemptView } from "@/lib/attempt-status";
 
 export async function GET(req: NextRequest) {
-  const user = await getSessionUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const user = await getSessionUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const attempts = await getAttemptOverview({ stuckOnly: true });
+    const attempts = await getAttemptOverview({ stuckOnly: true });
 
-  const testIds = Array.from(new Set(attempts.map((a) => a.test_id).filter(Boolean)));
-  const { data: tests } = testIds.length > 0
-    ? await db.from("tests").select("id, title, time_limit_minutes").in("id", testIds)
-    : { data: [] as any[] };
+    const testIds = Array.from(new Set(attempts.map((a) => a.test_id).filter(Boolean)));
+    const { data: tests } = testIds.length > 0
+      ? await db.from("tests").select("id, title, time_limit_minutes").in("id", testIds)
+      : { data: [] as any[] };
 
-  const { data: questionCounts } = await db
-    .from("questions")
-    .select("test_id")
-    .in("test_id", testIds.length ? testIds : ["00000000-0000-0000-0000-000000000000"]);
+    const { data: questionCounts } = await db
+      .from("questions")
+      .select("test_id")
+      .in("test_id", testIds.length ? testIds : ["00000000-0000-0000-0000-000000000000"]);
 
-  const countsByTest = new Map<string, number>();
-  for (const row of questionCounts ?? []) {
-    countsByTest.set(row.test_id, (countsByTest.get(row.test_id) ?? 0) + 1);
+    const countsByTest = new Map<string, number>();
+    for (const row of questionCounts ?? []) {
+      countsByTest.set(row.test_id, (countsByTest.get(row.test_id) ?? 0) + 1);
+    }
+
+    const testMap = Object.fromEntries((tests ?? []).map((t: any) => [t.id, t]));
+
+    const enriched = attempts.map((a) => {
+      const view = deriveAttemptView({
+        attempt_id: a.attempt_id,
+        test_id: a.test_id,
+        student_id: a.student_id,
+        test_title: a.test_title ?? "Unknown",
+        student_name: a.student_name ?? "Unknown",
+        class_id: a.class_id ?? "",
+        class_name: a.class_name ?? "",
+        attempt_status: a.attempt_status,
+        result_status: a.result_status,
+        total_score: a.total_score,
+        released_at: a.released_at,
+        started_at: a.started_at,
+        submitted_at: a.submitted_at,
+        time_limit_minutes: a.time_limit_minutes ?? 30,
+        total_possible_points: a.total_possible_points ?? 0,
+        essay_total: a.essay_total ?? 0,
+        essays_graded: a.essays_graded ?? 0,
+      });
+      const draft = (a.draft_answers ?? {}) as Record<string, string>;
+      const answeredCount = Object.values(draft).filter((v) => typeof v === "string" && v.trim()).length;
+      return {
+        id: a.attempt_id,
+        test_id: a.test_id,
+        test_title: testMap[a.test_id]?.title ?? "Unknown",
+        time_limit_minutes: testMap[a.test_id]?.time_limit_minutes ?? 0,
+        total_questions: countsByTest.get(a.test_id) ?? 0,
+        student_id: a.student_id,
+        student_name: a.student_name ?? "Unknown",
+        class_name: a.class_name ?? "",
+        started_at: a.started_at,
+        draft_answers: draft,
+        answered_count: answeredCount,
+        view,
+      };
+    });
+
+    return NextResponse.json(enriched);
+  } catch (e: any) {
+    console.error("Stuck attempts error:", e);
+    return NextResponse.json({ error: e.message ?? "Internal server error" }, { status: 500 });
   }
-
-  const testMap = Object.fromEntries((tests ?? []).map((t: any) => [t.id, t]));
-
-  const enriched = attempts.map((a) => {
-    const draft = (a.draft_answers ?? {}) as Record<string, string>;
-    const answeredCount = Object.values(draft).filter((v) => typeof v === "string" && v.trim()).length;
-    return {
-      id: a.attempt_id,
-      test_id: a.test_id,
-      test_title: testMap[a.test_id]?.title ?? "Unknown",
-      time_limit_minutes: testMap[a.test_id]?.time_limit_minutes ?? 0,
-      total_questions: countsByTest.get(a.test_id) ?? 0,
-      student_id: a.student_id,
-      student_name: a.student_name ?? "Unknown",
-      class_name: a.class_name ?? "",
-      started_at: a.started_at,
-      draft_answers: draft,
-      answered_count: answeredCount,
-    };
-  });
-
-  return NextResponse.json(enriched);
 }
 
 export async function POST(req: NextRequest) {

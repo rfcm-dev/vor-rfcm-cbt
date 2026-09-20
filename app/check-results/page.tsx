@@ -34,7 +34,12 @@ export default function CheckResultsPage() {
         return;
       }
       const body = await res.json();
-      setResults(Array.isArray(body) ? body : [body]);
+      const raw = Array.isArray(body) ? body : body.results ?? [];
+      setResults(raw.map((r: any) => ({
+        ...r,
+        percentage: r.percentage ?? 0,
+        grade: r.grade ?? scoreToGrade(r.percentage ?? 0),
+      })));
       setChecked(true);
     } catch {
       setError("Network error. Please try again.");
@@ -108,8 +113,8 @@ export default function CheckResultsPage() {
                   style={{ transitionDelay: `${idx * 150}ms` }}>
                   <p className="text-xs uppercase tracking-wide text-rfcm-charcoal/50 mb-2">{r.test_title}</p>
                   <div className="flex items-end justify-center gap-3 mb-2">
-                    <div className="text-5xl font-bold text-rfcm-red">{r.grade ?? scoreToGrade(r.total_score)}</div>
-                    <div className="text-2xl font-semibold text-rfcm-charcoal/70 mb-1">{r.total_score}%</div>
+                    <div className="text-5xl font-bold text-rfcm-red">{r.grade ?? scoreToGrade(r.percentage ?? 0)}</div>
+                    <div className="text-2xl font-semibold text-rfcm-charcoal/70 mb-1">{r.percentage ?? 0}%</div>
                   </div>
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>

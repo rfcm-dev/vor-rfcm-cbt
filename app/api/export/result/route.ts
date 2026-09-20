@@ -5,6 +5,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { db } from "@/lib/db";
 import { ResultDocument } from "@/lib/pdf";
 import { scoreToGrade } from "@/lib/grade";
+import { calculatePercentage } from "@/lib/grading";
 
 export async function GET(req: NextRequest) {
   const attemptId = req.nextUrl.searchParams.get("attempt_id");
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
 
   const { data: questions } = await db.from("questions").select("points").eq("test_id", enrichedResult.attempts?.test_id ?? "");
   const totalPossible = (questions ?? []).reduce((sum, q) => sum + Number(q.points ?? 0), 0);
-  const percentage = totalPossible > 0 ? Math.round(((enrichedResult.total_score ?? 0) / totalPossible) * 100) : 0;
+  const percentage = calculatePercentage(enrichedResult.total_score ?? 0, totalPossible);
 
   const buffer = await renderToBuffer(
     ResultDocument({

@@ -40,8 +40,8 @@ export default function QuestionSubmissionsPage() {
 
   useEffect(() => {
     fetch("/api/tests")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setTests)
+      .then((r) => r.ok ? r.json() : { data: [] })
+      .then((d) => setTests(d.data ?? []))
       .catch(() => setTests([]));
   }, []);
 

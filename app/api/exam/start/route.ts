@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
       const { data: attempt, error } = await db
         .from("attempts")
-        .insert({ test_id: test.id, student_id, status: "in_progress" })
+        .insert({ test_id: test.id, student_id, status: "in_progress", randomization_seed: crypto.randomUUID() })
         .select()
         .single();
 
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       .eq("test_id", test.id)
       .eq("student_id", student_id)
       .is("consumed_at", null)
+      .limit(1)
       .maybeSingle();
 
     if (retakeApproval) {
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
 
       const { data: attempt, error } = await db
         .from("attempts")
-        .insert({ test_id: test.id, student_id, status: "in_progress" })
+        .insert({ test_id: test.id, student_id, status: "in_progress", randomization_seed: crypto.randomUUID() })
         .select()
         .single();
 
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
 
   const { data: attempt, error } = await db
     .from("attempts")
-    .insert({ test_id: test.id, student_id, status: "in_progress" })
+    .insert({ test_id: test.id, student_id, status: "in_progress", randomization_seed: crypto.randomUUID() })
     .select()
     .single();
 

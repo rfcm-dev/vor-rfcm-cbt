@@ -11,7 +11,7 @@ type AttemptHistory = {
   id: string;
   test_id: string;
   test_title: string;
-  status: string;
+  status: 'in_progress' | 'stuck' | 'processing' | 'awaiting_grading' | 'ready_to_release' | 'released';
   started_at: string;
   submitted_at: string | null;
   total_score: number | null;
@@ -102,14 +102,17 @@ export default function StudentResultsPage() {
                     <div className="flex items-center gap-2 mt-2">
                       <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                         attempt.status === "in_progress" ? "bg-blue-100 text-blue-700" :
-                        attempt.status === "submitted" || attempt.status === "auto_submitted" ? "bg-yellow-100 text-yellow-700" :
+                        attempt.status === "stuck" ? "bg-orange-100 text-orange-700" :
+                        attempt.status === "processing" ? "bg-yellow-100 text-yellow-700" :
+                        attempt.status === "awaiting_grading" ? "bg-yellow-100 text-yellow-700" :
+                        attempt.status === "ready_to_release" ? "bg-emerald-100 text-emerald-700" :
                         "bg-green-100 text-green-700"
                       }`}>
                         {attempt.status.replace(/_/g, " ")}
                       </span>
-                      {attempt.result_status === "released" && attempt.total_score !== null && (
+                      {attempt.result_status === "released" && attempt.percentage !== null && (
                         <span className="text-xs text-rfcm-charcoal/60">
-                          {attempt.total_score}% · Grade {attempt.grade ?? "N/A"}
+                          {attempt.percentage}% · Grade {attempt.grade ?? "N/A"}
                         </span>
                       )}
                     </div>

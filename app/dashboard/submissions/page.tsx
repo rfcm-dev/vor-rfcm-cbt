@@ -15,9 +15,14 @@ type AttemptRow = {
   test_title: string;
   started_at: string;
   submitted_at: string | null;
-  status: string;
-  late_seconds: number;
-  result: { total_score: number | null; status: string } | null;
+  status: 'in_progress' | 'stuck' | 'processing' | 'awaiting_grading' | 'ready_to_release' | 'released';
+  isLate: boolean;
+  lateMinutes: number;
+  percentage: number | null;
+  grade: string | null;
+  canRelease: boolean;
+  essaysGraded: number;
+  essaysTotal: number;
 };
 
 export default function SubmissionsPage() {
@@ -58,7 +63,17 @@ export default function SubmissionsPage() {
     if (statusFilter) params.set("status", statusFilter);
     fetch(`/api/attempts/all?${params}`)
       .then((r) => r.ok ? r.json() : { attempts: [] })
-      .then((d) => setAttempts(d.attempts ?? []))
+      .then((d) => setAttempts((d.attempts ?? []).map((a: any) => ({
+        ...a,
+        status: a.status ?? "processing",
+        percentage: a.percentage ?? null,
+        grade: a.grade ?? null,
+        isLate: a.isLate ?? false,
+        lateMinutes: a.lateMinutes ?? 0,
+        canRelease: a.canRelease ?? false,
+        essaysGraded: a.essaysGraded ?? 0,
+        essaysTotal: a.essaysTotal ?? 0,
+      }))))
       .catch((e) => { setError(e.message); setAttempts([]); })
       .finally(() => setLoading(false));
   }, [testFilter, classFilter, statusFilter]);
@@ -153,18 +168,20 @@ export default function SubmissionsPage() {
                   <td className="px-4 py-2 text-rfcm-charcoal/70">{fmt(a.submitted_at)}</td>
                   <td className="px-4 py-2">
                     <span className="text-xs font-medium">
-                      {a.result?.status ?? "pending"}
+                      {a.status === "in_progress" ? "In progress" : a.status === "stuck" ? "Stuck" : a.status === "processing" ? "Processing" : a.status === "awaiting_grading" ? "Awaiting grading" : a.status === "ready_to_release" ? "Ready to release" : a.status === "released" ? "Released" : a.status}
                     </span>
-                    {a.late_seconds > 0 && <span className="text-xs text-rfcm-red ml-2">({Math.round(a.late_seconds / 60)}m late)</span>}
+                    {a.isLate && <span className="text-xs text-rfcm-red ml-2">({a.lateMinutes}m late)</span>}
                   </td>
-                  <td className="px-4 py-2 text-rfcm-charcoal/70">{a.result?.total_score ?? "—"}</td>
+                  <td className="px-4 py-2 text-rfcm-charcoal/70">
+                    {a.percentage !== null ? `${a.percentage}% · ${a.grade ?? "N/A"}` : "—"}
+                  </td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap gap-2">
                       <a href={`/api/export/worksheet?attempt_id=${a.id}`} className="text-xs text-rfcm-red font-medium hover:underline">Worksheet</a>
-                      {a.result?.status === "released" && (
+                      {a.status === "released" && (
                         <a href={`/api/export/result?attempt_id=${a.id}`} className="text-xs text-rfcm-red font-medium hover:underline">Result PDF</a>
                       )}
-                      {(a.status === "submitted" || a.status === "auto_submitted") && (
+                      {(a.status === "processing" || a.status === "awaiting_grading" || a.status === "ready_to_release" || a.status === "released") && (
                         <button
                           onClick={() => grantRetake(a.test_id, a.student_id)}
                           disabled={retaking}

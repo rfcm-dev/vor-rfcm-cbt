@@ -22,13 +22,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { title, time_limit_minutes, opens_at, closes_at, class_ids } = await req.json();
+  const { title, time_limit_minutes, opens_at, closes_at, class_ids, randomize_questions, randomize_options, sections } = await req.json();
 
   const updateData: any = {};
   if (title) updateData.title = title;
   if (time_limit_minutes) updateData.time_limit_minutes = time_limit_minutes;
   if (opens_at !== undefined) updateData.opens_at = opens_at || null;
   if (closes_at !== undefined) updateData.closes_at = closes_at || null;
+  if (randomize_questions !== undefined) updateData.randomize_questions = randomize_questions;
+  if (randomize_options !== undefined) updateData.randomize_options = randomize_options;
+  if (sections !== undefined) updateData.sections = sections;
 
   let data: any = null;
   if (Object.keys(updateData).length > 0) {

@@ -6,9 +6,13 @@ import { getSessionUser } from "@/lib/session";
 
 // GET: list classes. POST: create a class (admin/teacher/superadmin).
 export async function GET() {
-  const { data, error } = await db.from("classes").select("*").order("created_at", { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  try {
+    const { data, error } = await db.from("classes").select("*").order("created_at", { ascending: false });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(data ?? []);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message ?? "Failed to load classes" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {

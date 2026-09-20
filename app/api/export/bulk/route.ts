@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { getSessionUser } from "@/lib/session";
 import { WorksheetDocument, ResultDocument } from "@/lib/pdf";
 import { scoreToGrade } from "@/lib/grade";
+import { calculatePercentage } from "@/lib/grading";
 
 // Bulk export for end-of-term reporting: every released result (or every
 // worksheet) for a test, zipped into one download.
@@ -84,7 +85,7 @@ export async function GET(req: NextRequest) {
         .maybeSingle();
       if (!result) continue; // skip anything not yet released for a "result" bulk export
 
-      const percentage = totalPossible > 0 ? Math.round(((result.total_score ?? 0) / totalPossible) * 100) : 0;
+      const percentage = calculatePercentage(result.total_score ?? 0, totalPossible);
       const buffer = await renderToBuffer(
         ResultDocument({
           studentName,

@@ -33,7 +33,10 @@ export default function StuckAttemptsPage() {
     setLoading(true);
     fetch("/api/attempts/stuck")
       .then((r) => r.ok ? r.json() : [])
-      .then(setItems)
+      .then((items) => setItems((items ?? []).map((item: any) => ({
+        ...item,
+        view: item.view ?? null,
+      }))))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
   }

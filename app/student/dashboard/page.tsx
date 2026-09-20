@@ -10,10 +10,18 @@ type ExamSummary = {
   id: string;
   test_id: string;
   title: string;
-  status: string;
+  status: 'not_started' | 'in_progress' | 'stuck' | 'processing' | 'awaiting_grading' | 'ready_to_release' | 'released';
   started_at: string | null;
   submitted_at: string | null;
   result: { total_score: number | null; status: string } | null;
+  view?: {
+    status: 'in_progress' | 'stuck' | 'processing' | 'awaiting_grading' | 'ready_to_release' | 'released';
+    percentage: number | null;
+    grade: string | null;
+    isLate: boolean;
+    lateMinutes: number;
+    canRelease: boolean;
+  };
 };
 
 type ResultSummary = {
@@ -79,9 +87,12 @@ export default function StudentDashboardPage() {
     load();
   }, [router]);
 
-  const activeExam = useMemo(() => exams.find((e) => e.status === "in_progress"), [exams]);
-  const availableExams = useMemo(() => exams.filter((e) => e.status === "not_started"), [exams]);
-  const completedExams = useMemo(() => exams.filter((e) => e.status === "submitted" || e.status === "auto_submitted"), [exams]);
+  const activeExam = useMemo(() => exams.find((e) => e.view?.status === "in_progress" || e.view?.status === "stuck"), [exams]);
+  const availableExams = useMemo(() => exams.filter((e) => e.status === "not_started" || !e.view), [exams]);
+  const completedExams = useMemo(() => exams.filter((e) => {
+    const s = e.view?.status;
+    return s === "processing" || s === "awaiting_grading" || s === "ready_to_release" || s === "released";
+  }), [exams]);
 
   async function handleLogout() {
     await fetch("/api/auth/student-logout", { method: "POST" });
@@ -229,7 +240,7 @@ export default function StudentDashboardPage() {
                     <div>
                       <p className="font-medium text-rfcm-charcoal">{r.test_title}</p>
                       <p className="text-xs text-rfcm-charcoal/50 mt-1">
-                        {r.total_score !== null ? `${r.total_score}% · Grade ${r.grade ?? "N/A"}` : "Processing"}
+                        {r.total_score !== null ? `${r.percentage ?? 0}% · Grade ${r.grade ?? "N/A"}` : "Processing"}
                       </p>
                     </div>
                     {r.status === "released" && r.total_score !== null && (

@@ -6,7 +6,20 @@ import DashboardShell from "@/components/DashboardShell";
 import { useToast } from "@/components/ToastProvider";
 
 type TestSummary = { id: string; title: string; status: string; opens_at: string | null; closes_at: string | null; time_limit_minutes: number; submitted_count: number; pending_grading_count: number; ready_to_release_count: number };
-type AttemptRow = { id: string; test_id: string; student_id: string; student_name: string; started_at: string; submitted_at: string | null; status: string; late_seconds: number; result: { total_score: number | null; status: string } | null };
+type AttemptRow = {
+  id: string;
+  test_id: string;
+  student_id: string;
+  student_name: string;
+  started_at: string;
+  submitted_at: string | null;
+  status: 'in_progress' | 'stuck' | 'processing' | 'awaiting_grading' | 'ready_to_release' | 'released';
+  isLate: boolean;
+  lateMinutes: number;
+  percentage: number | null;
+  grade: string | null;
+  canRelease: boolean;
+};
 type AdminResult = { attempt_id: string; result_id: string; student_id: string; student_name: string; class_id: string; class_name: string; test_id: string; test_title: string; total_score: number | null; total_possible: number; percentage: number; grade: string; status: string; released_at: string | null; submitted_at: string | null };
 type ClassRow = { id: string; name: string };
 
@@ -72,7 +85,15 @@ function ResultsContent() {
     setSelected([]);
     fetch(`/api/attempts/all?test_id=${selectedTestId}`)
       .then((r) => r.ok ? r.json() : Promise.reject(new Error(`Failed to load attempts (${r.status})`)))
-      .then((data) => setAttempts(Array.isArray(data) ? data : data.attempts ?? []))
+      .then((data) => setAttempts((data.attempts ?? []).map((a: any) => ({
+        ...a,
+        status: a.status ?? "processing",
+        percentage: a.percentage ?? null,
+        grade: a.grade ?? null,
+        isLate: a.isLate ?? false,
+        lateMinutes: a.lateMinutes ?? 0,
+        canRelease: a.canRelease ?? false,
+      }))))
       .catch((e) => { setError(e.message); setAttempts([]); })
       .finally(() => setLoading(false));
   }, [tab, selectedTestId]);
@@ -98,7 +119,7 @@ function ResultsContent() {
     return sorted.sort((a, b) => a.student_name.localeCompare(b.student_name));
   }, [leaderboardResults, leaderboardSort]);
 
-  const gradable = useMemo(() => attempts.filter((a) => a.result?.status === "graded"), [attempts]);
+  const gradable = useMemo(() => attempts.filter((a) => a.canRelease), [attempts]);
 
   async function release() {
     setError("");
@@ -219,25 +240,25 @@ function ResultsContent() {
                 <span className="flex-1">
                   <span className="font-medium">{a.student_name}</span>
                   <span className="text-xs text-rfcm-charcoal/50 ml-2">
-                    {a.status === "in_progress" ? "In progress" : a.status === "submitted" || a.status === "auto_submitted" ? (a.result ? "Processing" : "Submitted — processing") : a.status}
+                    {a.status === "in_progress" ? "In progress" : a.status === "stuck" ? "Stuck" : a.status === "processing" ? "Processing" : a.status === "awaiting_grading" ? "Awaiting grading" : a.status === "ready_to_release" ? "Ready to release" : a.status === "released" ? "Released" : a.status}
                   </span>
-                  {a.late_seconds > 0 && (
-                    <span className="text-xs text-rfcm-red ml-2">Submitted {Math.round(a.late_seconds / 60)}m late</span>
+                  {a.isLate && (
+                    <span className="text-xs text-rfcm-red ml-2">Submitted {a.lateMinutes}m late</span>
                   )}
                 </span>
                 <span className="text-sm text-rfcm-charcoal/60">
-                  {a.result ? `${a.result.total_score ?? "pending"} pts · ${a.result.status}` : "No result yet"}
+                  {a.percentage !== null ? `${a.percentage}% · ${a.grade ?? "N/A"}` : "No result yet"}
                 </span>
-                {a.result?.status === "released" && (
+                {a.status === "released" && (
                   <a href={`/api/export/result?attempt_id=${a.id}`} className="text-xs text-rfcm-red font-medium hover:underline">Result PDF</a>
                 )}
-                {a.result?.status === "graded" && (
+                {a.canRelease && (
                   <label className="flex items-center gap-2">
                     <input type="checkbox" onChange={(e) => setSelected((s) => (e.target.checked ? [...s, a.id] : s.filter((id) => id !== a.id)))} />
                     <span className="text-xs text-rfcm-charcoal/60">Release</span>
                   </label>
                 )}
-                {(a.status === "submitted" || a.status === "auto_submitted") && (
+                {(a.status === "processing" || a.status === "awaiting_grading" || a.status === "ready_to_release" || a.status === "released") && (
                   <button
                     onClick={() => grantRetake(a.test_id, a.student_id)}
                     disabled={retaking}
