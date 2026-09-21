@@ -62,8 +62,8 @@ export default function SubmissionsPage() {
     if (classFilter) params.set("class_id", classFilter);
     if (statusFilter) params.set("status", statusFilter);
     fetch(`/api/attempts/all?${params}`)
-      .then((r) => r.ok ? r.json() : { attempts: [] })
-      .then((d) => setAttempts((d.attempts ?? []).map((a: any) => ({
+      .then((r) => r.ok ? r.json() : [])
+      .then((d) => setAttempts((Array.isArray(d) ? d : d.attempts ?? []).map((a: any) => ({
         ...a,
         status: a.status ?? "processing",
         percentage: a.percentage ?? null,

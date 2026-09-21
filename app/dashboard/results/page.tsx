@@ -85,7 +85,7 @@ function ResultsContent() {
     setSelected([]);
     fetch(`/api/attempts/all?test_id=${selectedTestId}`)
       .then((r) => r.ok ? r.json() : Promise.reject(new Error(`Failed to load attempts (${r.status})`)))
-      .then((data) => setAttempts((data.attempts ?? []).map((a: any) => ({
+      .then((data) => setAttempts((Array.isArray(data) ? data : data.attempts ?? []).map((a: any) => ({
         ...a,
         status: a.status ?? "processing",
         percentage: a.percentage ?? null,
