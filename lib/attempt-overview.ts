@@ -43,7 +43,7 @@ export async function getAttemptOverview(filters: AttemptOverviewFilters = {}) {
     } else {
       query = query.in("attempt_status", statuses);
     }
-  } else if (!filters.includeInProgress) {
+  } else if (!filters.includeInProgress && !filters.stuckOnly) {
     query = query.in("attempt_status", ["submitted", "auto_submitted"]);
   }
 
