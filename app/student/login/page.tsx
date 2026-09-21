@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import StudentLayout from "@/components/StudentLayout";
 import PrimaryButton from "@/components/PrimaryButton";
 import { useToast } from "@/components/ToastProvider";
 
@@ -44,8 +43,8 @@ export default function StudentLoginPage() {
   }
 
   return (
-    <StudentLayout>
-      <div className="max-w-sm mx-auto bg-white rounded-2xl border border-rfcm-yellow-soft p-6 md:p-8 animate-fade-in-up">
+    <div className="min-h-screen flex items-center justify-center bg-rfcm-charcoal px-4">
+      <div className={`max-w-sm w-full bg-white rounded-2xl p-6 md:p-8 shadow-xl transition-all duration-700 ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
         <div className="text-center mb-6">
           <h2 className="font-serif text-xl font-bold text-rfcm-charcoal">Student Login</h2>
           <p className="text-xs text-rfcm-charcoal/60 mt-1">Sign in with your registered name and password</p>
@@ -79,6 +78,6 @@ export default function StudentLoginPage() {
           Not registered yet? <a href="/register" className="text-rfcm-red font-medium hover:underline">Register here</a>
         </p>
       </div>
-    </StudentLayout>
+    </div>
   );
 }

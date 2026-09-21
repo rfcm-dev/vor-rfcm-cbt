@@ -8,23 +8,26 @@ import PrimaryButton from "@/components/PrimaryButton";
 
 type ClassOption = { id: string; name: string; class_code: string | null };
 type StudentOption = { id: string; name: string; teacher_name: string | null; photo_url: string | null };
+type ResolvedTest = { id: string; title: string; time_limit_minutes: number };
 
 const STEPS = [
   { key: "class", label: "Class", description: "Select your class" },
   { key: "student", label: "Name", description: "Enter your name" },
   { key: "profile", label: "Confirm", description: "Verify your profile" },
+  { key: "exam", label: "Exam", description: "Choose an examination" },
 ] as const;
 
 export default function StudentExamPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"class" | "student" | "profile">("class");
+  const [step, setStep] = useState<"class" | "student" | "profile" | "exam">("class");
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [classId, setClassId] = useState("");
   const [classCode, setClassCode] = useState("");
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [studentName, setStudentName] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
-  const [resolvedTestId, setResolvedTestId] = useState("");
+  const [resolvedTests, setResolvedTests] = useState<ResolvedTest[]>([]);
+  const [selectedTestId, setSelectedTestId] = useState("");
   const [photoError, setPhotoError] = useState(false);
   const [notRegistered, setNotRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -54,7 +57,11 @@ export default function StudentExamPage() {
       return;
     }
     const body = await res.json();
-    if (body.test?.id) setResolvedTestId(body.test.id);
+    const tests = (body.tests ?? []).map((t: any) => ({ id: t.id, title: t.title, time_limit_minutes: t.time_limit_minutes }));
+    setResolvedTests(tests);
+    if (tests.length === 1) {
+      setSelectedTestId(tests[0].id);
+    }
     const studentRes = await fetch(`/api/students/lookup?class_id=${classId}`);
     if (studentRes.ok) {
       setStudents(await studentRes.json());
@@ -84,12 +91,17 @@ export default function StudentExamPage() {
     }
     const { student } = await res.json();
     setSelectedStudent(student);
-    setStep("profile");
+    setStep(resolvedTests.length > 1 ? "exam" : "profile");
   }
 
   function confirmProfile() {
-    if (!selectedStudent) return;
-    router.push(`/exam/instructions?test_id=${resolvedTestId}&student_id=${selectedStudent.id}`);
+    if (!selectedStudent || !selectedTestId) return;
+    router.push(`/exam/instructions?test_id=${selectedTestId}&student_id=${selectedStudent.id}`);
+  }
+
+  function startExam() {
+    if (!selectedTestId || !selectedStudent) return;
+    router.push(`/exam/instructions?test_id=${selectedTestId}&student_id=${selectedStudent.id}`);
   }
 
   function startOver() {
@@ -246,6 +258,29 @@ export default function StudentExamPage() {
             <div className="flex gap-3 pt-2">
               <button onClick={startOver} className="flex-1 rounded-xl border border-rfcm-yellow-soft py-3 font-medium hover:bg-rfcm-cream-dark transition-colors">Not you? Start over</button>
               <PrimaryButton onClick={confirmProfile} className="flex-1">Continue</PrimaryButton>
+            </div>
+          </div>
+        )}
+
+        {step === "exam" && selectedStudent && (
+          <div className="text-center space-y-5">
+            <div>
+              <h2 className="font-serif text-xl font-bold">Choose an Examination</h2>
+              <p className="text-xs text-rfcm-charcoal/60 mt-1">Multiple exams are available for your class</p>
+            </div>
+            <div className="space-y-3">
+              {resolvedTests.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setSelectedTestId(t.id); startExam(); }}
+                  className={`w-full rounded-xl border-2 p-4 text-left transition-all ${
+                    selectedTestId === t.id ? "border-rfcm-red bg-rfcm-red/5" : "border-rfcm-yellow-soft hover:border-rfcm-red/30"
+                  }`}
+                >
+                  <p className="font-medium text-rfcm-charcoal">{t.title}</p>
+                  <p className="text-xs text-rfcm-charcoal/50 mt-1">{t.time_limit_minutes} minutes</p>
+                </button>
+              ))}
             </div>
           </div>
         )}

@@ -88,44 +88,52 @@ export default function StudentResultsPage() {
           <div className="space-y-3">
             {attempts.map((attempt, idx) => (
               <div key={attempt.id} className={`bg-white rounded-2xl border border-rfcm-yellow-soft p-5 shadow-sm hover:shadow-md hover:border-rfcm-red/30 transition-all ${mounted ? "animate-fade-in-up opacity-100 translate-y-0" : "opacity-0 translate-y-4"} stagger-${(idx % 6) + 1}`}>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="font-medium text-rfcm-charcoal">{attempt.test_title}</p>
-                    <p className="text-xs text-rfcm-charcoal/50 mt-1">
-                      Started: {new Date(attempt.started_at).toLocaleString()}
-                    </p>
-                    {attempt.submitted_at && (
-                      <p className="text-xs text-rfcm-charcoal/50">
-                        Submitted: {new Date(attempt.submitted_at).toLocaleString()}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex-1">
+                      <p className="font-medium text-rfcm-charcoal">{attempt.test_title}</p>
+                      <p className="text-xs text-rfcm-charcoal/50 mt-1">
+                        Started: {new Date(attempt.started_at).toLocaleString()}
                       </p>
-                    )}
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                        attempt.status === "in_progress" ? "bg-blue-100 text-blue-700" :
-                        attempt.status === "stuck" ? "bg-orange-100 text-orange-700" :
-                        attempt.status === "processing" ? "bg-yellow-100 text-yellow-700" :
-                        attempt.status === "awaiting_grading" ? "bg-yellow-100 text-yellow-700" :
-                        attempt.status === "ready_to_release" ? "bg-emerald-100 text-emerald-700" :
-                        "bg-green-100 text-green-700"
-                      }`}>
-                        {attempt.status.replace(/_/g, " ")}
-                      </span>
-                      {attempt.result_status === "released" && attempt.percentage !== null && (
-                        <span className="text-xs text-rfcm-charcoal/60">
-                          {attempt.percentage}% · Grade {attempt.grade ?? "N/A"}
+                      {attempt.submitted_at && (
+                        <p className="text-xs text-rfcm-charcoal/50">
+                          Submitted: {new Date(attempt.submitted_at).toLocaleString()}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
+                          attempt.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                          attempt.status === "stuck" ? "bg-orange-100 text-orange-700" :
+                          attempt.status === "processing" ? "bg-yellow-100 text-yellow-700" :
+                          attempt.status === "awaiting_grading" ? "bg-yellow-100 text-yellow-700" :
+                          attempt.status === "ready_to_release" ? "bg-emerald-100 text-emerald-700" :
+                          "bg-green-100 text-green-700"
+                        }`}>
+                          {attempt.status.replace(/_/g, " ")}
                         </span>
+                        {attempt.result_status === "released" && attempt.percentage !== null && (
+                          <span className="text-xs text-rfcm-charcoal/60">
+                            {attempt.percentage}% · Grade {attempt.grade ?? "N/A"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {attempt.result_status === "released" && attempt.total_score !== null && (
+                        <>
+                          <div className="text-right">
+                            <p className="text-2xl font-bold text-rfcm-charcoal">{attempt.percentage ?? 0}%</p>
+                            <p className="text-xs text-rfcm-charcoal/50">Grade: {attempt.grade ?? "N/A"}</p>
+                          </div>
+                          <button onClick={() => router.push(`/api/export/result?attempt_id=${attempt.id}`)} className="inline-flex items-center gap-2 rounded-xl border border-rfcm-yellow-soft text-rfcm-charcoal text-sm font-medium px-4 py-2 hover:bg-rfcm-cream-dark transition-colors">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Result
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
-                  {attempt.result_status === "released" && attempt.total_score !== null && (
-                    <button onClick={() => router.push(`/api/export/result?attempt_id=${attempt.id}`)} className="inline-flex items-center gap-2 rounded-xl border border-rfcm-yellow-soft text-rfcm-charcoal text-sm font-medium px-4 py-2 hover:bg-rfcm-cream-dark transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Result
-                    </button>
-                  )}
-                </div>
               </div>
             ))}
           </div>

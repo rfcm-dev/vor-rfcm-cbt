@@ -50,13 +50,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No examination is currently available for this class" }, { status: 404 });
   }
 
-  if (openTests.length > 1) {
-    return NextResponse.json({ error: "More than one examination is open for this class — contact your admin" }, { status: 409 });
-  }
+  const { count } = await db.from("questions").select("*", { count: "exact", head: true }).eq("test_id", openTests[0].id);
 
-  const test = openTests[0];
-
-  const { count } = await db.from("questions").select("*", { count: "exact", head: true }).eq("test_id", test.id);
-
-  return NextResponse.json({ test, class: classRow, question_count: count ?? 0 });
+  return NextResponse.json({ tests: openTests, class: classRow, question_count: count ?? 0 });
 }
