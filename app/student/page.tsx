@@ -62,7 +62,11 @@ export default function StudentExamPage() {
     if (tests.length === 1) {
       setSelectedTestId(tests[0].id);
     }
-    const studentRes = await fetch(`/api/students/lookup?class_id=${classId}`);
+    const studentRes = await fetch("/api/students/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ class_id: classId }),
+    });
     if (studentRes.ok) {
       setStudents(await studentRes.json());
     }

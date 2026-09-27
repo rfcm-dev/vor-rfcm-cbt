@@ -37,8 +37,18 @@ export async function GET() {
       });
     }
 
+    const retakeTestIds = new Set<string>();
+    if (classId) {
+      const { data: retakeApprovals } = await db
+        .from("retake_approvals")
+        .select("test_id")
+        .eq("student_id", student.id)
+        .is("consumed_at", null);
+      (retakeApprovals ?? []).forEach((r: any) => retakeTestIds.add(r.test_id));
+    }
+
     const available = availableTests
-      .filter((t: any) => !attemptedTestIds.has(t.id))
+      .filter((t: any) => !attemptedTestIds.has(t.id) || retakeTestIds.has(t.id))
       .map((t: any) => ({
         id: null,
         test_id: t.id,

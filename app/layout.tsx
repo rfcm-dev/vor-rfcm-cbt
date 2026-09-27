@@ -1,4 +1,5 @@
 import "./globals.css";
+import ClientErrorCapture from "@/components/ClientErrorCapture";
 
 export const metadata = {
   title: "RFCM CBT",
@@ -15,7 +16,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <ClientErrorCapture />
+        {children}
+      </body>
     </html>
   );
 }

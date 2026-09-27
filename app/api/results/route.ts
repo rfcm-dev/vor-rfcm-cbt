@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
     const className = req.nextUrl.searchParams.get("class_name")?.trim();
     const classCode = req.nextUrl.searchParams.get("class_code")?.trim();
     const studentName = req.nextUrl.searchParams.get("student_name")?.trim();
+    const testId = req.nextUrl.searchParams.get("test_id")?.trim();
 
     if (!className || !studentName) {
       return NextResponse.json({ error: "class_name and student_name are required" }, { status: 400 });
@@ -24,19 +25,35 @@ export async function GET(req: NextRequest) {
     if (!classRow) return NextResponse.json({ error: "Class not found" }, { status: 404 });
 
     const trimmedName = studentName.trim();
-    const { data: students } = await db
+    let student = null;
+
+    const { data: exactStudent } = await db
       .from("students")
       .select("id")
       .eq("class_id", classRow.id)
-      .ilike("name", trimmedName + "%")
-      .limit(1);
+      .ilike("name", trimmedName)
+      .maybeSingle();
 
-    const student = students?.[0];
+    if (exactStudent) {
+      student = exactStudent;
+    } else {
+      const { data: students } = await db
+        .from("students")
+        .select("id")
+        .eq("class_id", classRow.id)
+        .ilike("name", trimmedName + "%")
+        .limit(1);
+
+      student = students?.[0] ?? null;
+    }
+
     if (!student) return NextResponse.json([]);
 
     const overview = await getAttemptOverview({
       studentId: student.id,
+      includeInProgress: true,
       resultStatus: "released",
+      testId: testId || undefined,
     });
 
     const mapped = overview.map((a: any) => {

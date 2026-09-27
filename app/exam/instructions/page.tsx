@@ -12,7 +12,7 @@ function InstructionsInner() {
   const searchParams = useSearchParams();
   const testId = searchParams.get("test_id") ?? "";
 
-  const [studentId, setStudentId] = useState("");
+  const [studentId, setStudentId] = useState(searchParams.get("student_id") ?? "");
   const [test, setTest] = useState<{ title: string; time_limit_minutes: number } | null>(null);
   const [questionCount, setQuestionCount] = useState(0);
   const [loading, setLoading] = useState(true);

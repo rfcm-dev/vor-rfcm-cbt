@@ -81,7 +81,14 @@ function TakeExamInner() {
         }
 
         const qRes = await fetch(`/api/questions?test_id=${body.test.id}&seed=${body.attempt.randomization_seed}&randomize_questions=${body.test.randomize_questions ? "1" : "0"}&randomize_options=${body.test.randomize_options ? "1" : "0"}`);
+        if (!qRes.ok) {
+          const err = await qRes.json().catch(() => ({}));
+          throw new Error(err.error ?? `Failed to load questions (${qRes.status})`);
+        }
         const qData = await qRes.json();
+        if (!Array.isArray(qData)) {
+          throw new Error("Questions response was not in the expected format");
+        }
         setQuestions(qData);
       } catch (e: any) {
         setInitError(e.message ?? "Failed to load exam");
@@ -144,12 +151,16 @@ function TakeExamInner() {
       submittingRef.current = true;
       try {
         const activeQuestions = sections.length > 0 ? sectionQuestions : questions;
+        const answersArray = Object.entries(answers);
+        const submittedAnswers = activeQuestions.length > 0
+          ? answersArray
+              .filter(([question_id]) => activeQuestions.some((q) => q.id === question_id))
+              .map(([question_id, response]) => ({ question_id, response }))
+          : answersArray.map(([question_id, response]) => ({ question_id, response }));
         const payload = {
           attempt_id: attemptId,
           auto_submitted: autoSubmitted,
-          answers: Object.entries(answers)
-            .filter(([question_id]) => activeQuestions.some((q) => q.id === question_id))
-            .map(([question_id, response]) => ({ question_id, response })),
+          answers: submittedAnswers,
         };
 
         const maxRetries = 3;

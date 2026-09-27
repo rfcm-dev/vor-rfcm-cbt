@@ -13,6 +13,7 @@ function generateExamCode(title: string) {
 
 export async function GET(req: NextRequest) {
   try {
+    const publicList = req.nextUrl.searchParams.get("public");
     const classId = req.nextUrl.searchParams.get("class_id");
     const page = Math.max(1, parseInt(req.nextUrl.searchParams.get("page") || "1", 10));
     const limit = Math.min(50, Math.max(1, parseInt(req.nextUrl.searchParams.get("limit") || "20", 10)));
@@ -66,6 +67,17 @@ export async function GET(req: NextRequest) {
       pending_grading_count: pendingByTest[t.id] || 0,
       ready_to_release_count: readyByTest[t.id] || 0,
     }));
+
+    if (publicList === "1") {
+      const now = new Date();
+      const publicTests = (enriched ?? []).filter((t: any) => {
+        if (t.status !== "active") return false;
+        if (t.opens_at && new Date(t.opens_at) > now) return false;
+        if (t.closes_at && new Date(t.closes_at) < now) return false;
+        return true;
+      });
+      return NextResponse.json({ data: publicTests, count: publicTests.length, page: 1, limit: publicTests.length });
+    }
 
     return NextResponse.json({ data: enriched, count: count ?? 0, page, limit });
   } catch (e: any) {

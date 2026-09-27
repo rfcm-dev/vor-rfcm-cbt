@@ -36,6 +36,7 @@ export async function GET() {
 
     const overview = await getAttemptOverview({
       studentId: student.id,
+      includeInProgress: true,
       resultStatus: "released",
     });
     const overviewMap = new Map((overview ?? []).map((o: any) => [o.attempt_id, o]));
